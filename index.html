@@ -383,7 +383,7 @@
     const input = document.getElementById('passphrase-input').value.trim().toLowerCase();
     if (input === _pd(_pp)) {
       document.getElementById('lock-screen').style.display = 'none';
-      document.getElementById('main-ui').style.display = '';
+      document.getElementById('main-ui').style.display = 'block';
       loadRegistry();
       renderChaosGrid();
     } else {
