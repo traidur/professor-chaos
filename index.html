@@ -1,0 +1,762 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Professor Chaos — Site Generator</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body, html {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: #0f172a;
+      color: #e2e8f0;
+      min-height: 100vh;
+    }
+
+    header {
+      background: #1e293b;
+      border-bottom: 3px solid #7c3aed;
+      padding: 1rem 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    header h1 { font-size: 1.3rem; font-weight: 800; color: #7c3aed; letter-spacing: -0.02em; }
+    header h1 span { color: #e2e8f0; }
+    .header-sub { font-size: 0.78rem; color: #64748b; }
+
+    main { max-width: 860px; margin: 0 auto; padding: 2rem 1rem; }
+
+    /* LOCK SCREEN */
+    #lock-screen {
+      display: flex; align-items: center; justify-content: center;
+      min-height: 70vh;
+    }
+    .lock-box {
+      background: #1e293b; border: 1px solid #334155;
+      border-radius: 16px; padding: 2.5rem 2rem;
+      max-width: 360px; width: 100%; text-align: center;
+    }
+    .lock-box .icon { font-size: 3rem; margin-bottom: 1rem; }
+    .lock-box h2 { font-size: 1.2rem; font-weight: 700; margin-bottom: 0.4rem; }
+    .lock-box p { font-size: 0.82rem; color: #94a3b8; margin-bottom: 1.5rem; }
+    .lock-box input {
+      width: 100%; padding: 0.6rem 0.9rem;
+      background: #0f172a; border: 1.5px solid #334155;
+      border-radius: 8px; color: white; font-size: 1rem;
+      text-align: center; letter-spacing: 0.1em; margin-bottom: 0.75rem;
+    }
+    .lock-box input:focus { outline: none; border-color: #7c3aed; }
+    .lock-error { color: #f87171; font-size: 0.8rem; margin-top: 0.5rem; }
+
+    /* MAIN UI TABS */
+    #main-ui { display: none; }
+    .tabs {
+      display: flex; gap: 0; border-bottom: 1px solid #334155; margin-bottom: 2rem;
+    }
+    .tab-btn {
+      background: none; border: none; border-bottom: 3px solid transparent;
+      color: #64748b; padding: 0.75rem 1.25rem; cursor: pointer;
+      font-size: 0.875rem; font-weight: 500; transition: all 0.15s; margin-bottom: -1px;
+    }
+    .tab-btn:hover { color: #e2e8f0; }
+    .tab-btn.active { color: #7c3aed; border-bottom-color: #7c3aed; font-weight: 600; }
+    .tab-pane { display: none; }
+    .tab-pane.active { display: block; }
+
+    /* FORM STYLES */
+    .form-section {
+      background: #1e293b; border: 1px solid #334155;
+      border-radius: 12px; padding: 1.5rem; margin-bottom: 1.25rem;
+    }
+    .form-section h3 {
+      font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em;
+      color: #7c3aed; margin-bottom: 1.25rem; font-weight: 700;
+    }
+    .fg { margin-bottom: 1rem; }
+    .fg label { display: block; font-size: 0.8rem; font-weight: 600; margin-bottom: 0.3rem; color: #94a3b8; }
+    .fg input, .fg select {
+      width: 100%; padding: 0.55rem 0.85rem;
+      background: #0f172a; border: 1.5px solid #334155;
+      border-radius: 8px; color: #e2e8f0; font-size: 0.9rem; font-family: inherit;
+    }
+    .fg input[type=color] { height: 42px; padding: 0.25rem 0.5rem; cursor: pointer; }
+    .fg input:focus, .fg select:focus { outline: none; border-color: #7c3aed; }
+    .fg input::placeholder { color: #475569; }
+    .fg .hint { font-size: 0.72rem; color: #475569; margin-top: 0.3rem; }
+    .fg-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+    .fg-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; }
+
+    /* TOGGLE */
+    .toggle-row { display: flex; align-items: center; justify-content: space-between; padding: 0.6rem 0; }
+    .toggle-row label { font-size: 0.875rem; color: #cbd5e1; }
+    .toggle-row .toggle-sub { font-size: 0.75rem; color: #475569; }
+    .toggle {
+      position: relative; width: 42px; height: 24px; cursor: pointer;
+    }
+    .toggle input { opacity: 0; width: 0; height: 0; }
+    .toggle-slider {
+      position: absolute; inset: 0; background: #334155; border-radius: 24px; transition: 0.2s;
+    }
+    .toggle-slider:before {
+      content: ''; position: absolute; height: 18px; width: 18px;
+      left: 3px; bottom: 3px; background: white; border-radius: 50%; transition: 0.2s;
+    }
+    .toggle input:checked + .toggle-slider { background: #7c3aed; }
+    .toggle input:checked + .toggle-slider:before { transform: translateX(18px); }
+
+    /* PASSCODE INPUTS */
+    .passcode-list { display: flex; flex-direction: column; gap: 0.5rem; }
+    .passcode-entry { display: flex; gap: 0.5rem; align-items: center; }
+    .passcode-entry input { flex: 1; }
+    .passcode-entry .remove-btn {
+      background: none; border: none; color: #ef4444; cursor: pointer; font-size: 1rem; padding: 0.2rem;
+    }
+
+    /* BUTTONS */
+    .btn {
+      background: #7c3aed; color: white; border: none;
+      padding: 0.6rem 1.25rem; border-radius: 8px; cursor: pointer;
+      font-size: 0.875rem; font-weight: 600; transition: background 0.15s;
+    }
+    .btn:hover { background: #6d28d9; }
+    .btn:disabled { background: #334155; color: #64748b; cursor: not-allowed; }
+    .btn.secondary { background: #334155; }
+    .btn.secondary:hover { background: #475569; }
+    .btn.danger { background: #ef4444; }
+    .btn.danger:hover { background: #dc2626; }
+    .btn.sm { padding: 0.35rem 0.75rem; font-size: 0.78rem; }
+    .btn-row { display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap; }
+
+    /* STATUS / ALERTS */
+    .alert {
+      padding: 0.75rem 1rem; border-radius: 8px; font-size: 0.84rem;
+      border-left: 4px solid; margin-bottom: 1rem;
+    }
+    .alert.info  { background: #1e3a5f; border-color: #3b82f6; color: #93c5fd; }
+    .alert.ok    { background: #14532d; border-color: #22c55e; color: #86efac; }
+    .alert.err   { background: #7f1d1d; border-color: #ef4444; color: #fca5a5; }
+    .alert.warn  { background: #78350f; border-color: #f59e0b; color: #fcd34d; }
+
+    /* PROGRESS STEPS */
+    .step-list { list-style: none; }
+    .step-list li {
+      display: flex; align-items: flex-start; gap: 0.75rem;
+      padding: 0.5rem 0; font-size: 0.85rem; color: #94a3b8;
+    }
+    .step-list li.done  { color: #86efac; }
+    .step-list li.doing { color: #fcd34d; }
+    .step-list li.fail  { color: #fca5a5; }
+    .step-icon { font-size: 1rem; width: 1.25rem; flex-shrink: 0; text-align: center; }
+
+    /* REGISTRY TABLE */
+    .reg-table { width: 100%; border-collapse: collapse; font-size: 0.84rem; }
+    .reg-table th { text-align: left; padding: 0.6rem 0.75rem; color: #64748b; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid #334155; }
+    .reg-table td { padding: 0.7rem 0.75rem; border-bottom: 1px solid #1e293b; vertical-align: middle; }
+    .reg-table tr:last-child td { border-bottom: none; }
+    .slot-name { font-family: monospace; color: #7c3aed; font-weight: 600; }
+    .slot-url a { color: #60a5fa; font-size: 0.78rem; word-break: break-all; }
+    .avail-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
+    .avail-dot.green { background: #22c55e; }
+    .avail-dot.red { background: #ef4444; }
+    .loading { color: #64748b; padding: 2rem; text-align: center; font-size: 0.875rem; }
+
+    /* CHAOS CONFIG */
+    .chaos-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.25rem 1.5rem; }
+    @media (max-width: 600px) { .chaos-grid { grid-template-columns: 1fr; } .fg-row, .fg-3 { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>Professor <span>Chaos</span></h1>
+    <div class="header-sub">Polling site generator</div>
+  </div>
+  <div id="slot-counter" style="font-size:0.8rem;color:#64748b"></div>
+</header>
+
+<!-- LOCK SCREEN -->
+<div id="lock-screen">
+  <div class="lock-box">
+    <div class="icon">🔐</div>
+    <h2>Access Required</h2>
+    <p>Enter the professor's passphrase to continue.</p>
+    <input type="password" id="passphrase-input" placeholder="••••••••" onkeydown="if(event.key==='Enter')unlock()">
+    <br>
+    <button class="btn" onclick="unlock()" style="width:100%">Unlock</button>
+    <div id="lock-error" class="lock-error"></div>
+  </div>
+</div>
+
+<!-- MAIN UI -->
+<div id="main-ui">
+  <main>
+    <div id="flash"></div>
+
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="generate" onclick="switchTab(this)">Generate Site</button>
+      <button class="tab-btn" data-tab="registry" onclick="switchTab(this)">Registry</button>
+      <button class="tab-btn" data-tab="chaos-cfg" onclick="switchTab(this)">Chaos Config</button>
+    </div>
+
+    <!-- ── GENERATE TAB ── -->
+    <div id="tab-generate" class="tab-pane active">
+
+      <div class="form-section">
+        <h3>Site Identity</h3>
+        <div class="fg-row">
+          <div class="fg">
+            <label>Site Name</label>
+            <input id="cfg-app-name" type="text" placeholder="Friday Lunch Vote" maxlength="60">
+          </div>
+          <div class="fg">
+            <label>GitHub Repo Name</label>
+            <input id="cfg-repo-name" type="text" placeholder="friday-lunch-vote" maxlength="60">
+            <div class="hint">Auto-generated from site name. Letters, numbers, hyphens only.</div>
+          </div>
+        </div>
+        <div class="fg">
+          <label>Primary Color</label>
+          <input id="cfg-color" type="color" value="#7c3aed">
+        </div>
+      </div>
+
+      <div class="form-section">
+        <h3>What Are You Voting On?</h3>
+        <div class="fg-row">
+          <div class="fg">
+            <label>Item Noun (singular)</label>
+            <input id="cfg-noun" type="text" placeholder="restaurant" maxlength="40">
+          </div>
+          <div class="fg">
+            <label>Item Noun (plural)</label>
+            <input id="cfg-noun-plural" type="text" placeholder="restaurants" maxlength="40">
+          </div>
+        </div>
+        <div class="fg-row">
+          <div class="fg">
+            <label>Required Field Label</label>
+            <input id="cfg-field1" type="text" placeholder="Name" maxlength="40">
+          </div>
+          <div class="fg">
+            <label>Optional Field Label</label>
+            <input id="cfg-field2" type="text" placeholder="Notes (leave blank to hide)" maxlength="40">
+          </div>
+        </div>
+      </div>
+
+      <div class="form-section">
+        <h3>Ballot Timing</h3>
+        <div class="fg-row">
+          <div class="fg">
+            <label>Ballot Opens On</label>
+            <select id="cfg-open-day">
+              <option value="null">No restriction</option>
+              <option value="0">Sunday</option>
+              <option value="1">Monday</option>
+              <option value="2">Tuesday</option>
+              <option value="3">Wednesday</option>
+              <option value="4" selected>Thursday</option>
+              <option value="5">Friday</option>
+              <option value="6">Saturday</option>
+            </select>
+          </div>
+          <div class="fg">
+            <label>Ballot Closes On</label>
+            <select id="cfg-close-day">
+              <option value="null">No restriction</option>
+              <option value="0">Sunday</option>
+              <option value="1">Monday</option>
+              <option value="2">Tuesday</option>
+              <option value="3">Wednesday</option>
+              <option value="4">Thursday</option>
+              <option value="5" selected>Friday</option>
+              <option value="6">Saturday</option>
+            </select>
+          </div>
+        </div>
+        <div class="toggle-row">
+          <div>
+            <label>Recency Weighting</label>
+            <div class="toggle-sub">Recently selected items appear less often in new rounds</div>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" id="cfg-recency" checked>
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>
+
+      <div class="form-section">
+        <h3>Admin Passcodes</h3>
+        <p style="font-size:0.8rem;color:#64748b;margin-bottom:1rem">These names unlock admin features on the generated site. Stored obfuscated in the HTML.</p>
+        <div class="passcode-list" id="passcode-list">
+          <div class="passcode-entry">
+            <input type="text" placeholder="passcode (e.g. strongbad)" maxlength="50">
+          </div>
+        </div>
+        <button class="btn secondary sm" onclick="addPasscode()" style="margin-top:0.75rem">+ Add Passcode</button>
+      </div>
+
+      <div class="form-section">
+        <h3>Chaos Face Image</h3>
+        <div class="fg">
+          <label>Face Image URL (optional)</label>
+          <input id="cfg-face-url" type="url" placeholder="https://example.com/someface.png">
+          <div class="hint">Publicly accessible image URL. This face will trail the chaos cat on this site. Leave blank to disable the feature.</div>
+        </div>
+      </div>
+
+      <div class="form-section">
+        <h3>GitHub Deployment</h3>
+        <div class="fg">
+          <label>GitHub Personal Access Token</label>
+          <input id="cfg-pat" type="password" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx">
+          <div class="hint">Needs <code>repo</code> scope. <a href="https://github.com/settings/tokens/new?scopes=repo&description=professor-chaos" target="_blank" style="color:#7c3aed">Generate one here ↗</a></div>
+        </div>
+      </div>
+
+      <div id="generate-status"></div>
+
+      <div class="btn-row">
+        <button class="btn" id="generate-btn" onclick="runGenerate()">Generate &amp; Deploy ⚡</button>
+        <span style="font-size:0.78rem;color:#475569">This will claim a slot, build the site, create a GitHub repo, and enable Pages.</span>
+      </div>
+    </div>
+
+    <!-- ── REGISTRY TAB ── -->
+    <div id="tab-registry" class="tab-pane">
+      <div id="registry-content"><div class="loading">Loading registry...</div></div>
+    </div>
+
+    <!-- ── CHAOS CONFIG TAB ── -->
+    <div id="tab-chaos-cfg" class="tab-pane">
+      <div class="form-section">
+        <h3>Chaos Elements</h3>
+        <p style="font-size:0.8rem;color:#64748b;margin-bottom:1.25rem">
+          Changes here require editing <code>CHAOS_CONFIG</code> at the top of <code>chaos.js</code> and pushing to GitHub.
+          All generated sites automatically pick up the change.
+        </p>
+        <div class="chaos-grid" id="chaos-grid"></div>
+        <div style="margin-top:1.25rem" class="alert info">
+          ℹ️ Open <code>chaos.js</code> in your editor and set any element to <code>false</code> to disable it globally.
+          Push to GitHub Pages — done.
+        </div>
+      </div>
+      <div class="form-section">
+        <h3>Add New Chaos Element</h3>
+        <p style="font-size:0.8rem;color:#64748b;margin-bottom:1rem">
+          Write a new function in <code>chaos.js</code>, add it to <code>CHAOS_CONFIG</code>, then call it inside <code>startChaos()</code>.
+          Every generated site gets it on next page load. No deploys needed on generated sites.
+        </p>
+        <div class="alert warn">
+          🔥 This is your superpower. Update one file, chaos everywhere.
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script>
+  // ── PLATFORM CONFIG ──────────────────────────────────────────────────────────
+  // Fill these in after creating your new Supabase project and running setup-slots.sql
+  const PLATFORM_SUPABASE_URL      = 'https://gsitwuzhtyzdgoihmruz.supabase.co';
+  const PLATFORM_SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdzaXR3dXpodHl6ZGdvaWhtcnV6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc2NjAyMDAsImV4cCI6MjA5MzIzNjIwMH0.wfLeKzqQGbpivMFswqb0W88KIPG0p7CGuCRfBwfRWZ4';
+
+  // The public URL where professor-chaos is deployed (GitHub Pages)
+  const PROFESSOR_CHAOS_URL = 'https://traidur.github.io/professor-chaos';
+
+  // Passphrase: encode with encodePasscode() then paste here
+  // Default: 'butters' — change this before deploying!
+  const _pp = ["27","35","3c","24","24","2d","d5","c4"];
+  const _pd = e => e.map((h,i) => String.fromCharCode((parseInt(h,16) ^ 83) - i*5)).reverse().join('');
+  // ────────────────────────────────────────────────────────────────────────────
+
+  const { createClient } = supabase;
+  const db = createClient(PLATFORM_SUPABASE_URL, PLATFORM_SUPABASE_ANON_KEY);
+
+  // ── LOCK SCREEN ──────────────────────────────────────────────────────────────
+  function unlock() {
+    const input = document.getElementById('passphrase-input').value.trim().toLowerCase();
+    if (input === _pd(_pp)) {
+      document.getElementById('lock-screen').style.display = 'none';
+      document.getElementById('main-ui').style.display = '';
+      loadRegistry();
+      renderChaosGrid();
+    } else {
+      document.getElementById('lock-error').textContent = 'Wrong passphrase.';
+      document.getElementById('passphrase-input').value = '';
+    }
+  }
+
+  // ── TABS ─────────────────────────────────────────────────────────────────────
+  function switchTab(btn) {
+    document.querySelectorAll('.tab-pane').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+    const tab = btn.dataset.tab;
+    document.getElementById(`tab-${tab}`).classList.add('active');
+    btn.classList.add('active');
+    if (tab === 'registry') loadRegistry();
+  }
+
+  // ── PASSCODE MANAGEMENT ──────────────────────────────────────────────────────
+  function addPasscode() {
+    const list = document.getElementById('passcode-list');
+    if (list.children.length >= 3) return;
+    const entry = document.createElement('div');
+    entry.className = 'passcode-entry';
+    entry.innerHTML = `<input type="text" placeholder="passcode" maxlength="50"><button class="remove-btn" onclick="this.parentElement.remove()">✕</button>`;
+    list.appendChild(entry);
+  }
+
+  function getPasscodes() {
+    return [...document.querySelectorAll('.passcode-entry input')]
+      .map(i => i.value.trim().toLowerCase())
+      .filter(Boolean);
+  }
+
+  // ── PASSCODE ENCODING ─────────────────────────────────────────────────────────
+  function encodePasscode(name) {
+    return name.toLowerCase().split('').reverse()
+      .map((c, i) => ((c.charCodeAt(0) + i * 5) ^ 83).toString(16).padStart(2, '0'));
+  }
+
+  // ── AUTO-SLUG ─────────────────────────────────────────────────────────────────
+  document.getElementById('cfg-app-name').addEventListener('input', e => {
+    const slug = e.target.value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    document.getElementById('cfg-repo-name').value = slug;
+  });
+
+  // ── COLOR DARKENER ────────────────────────────────────────────────────────────
+  function darkenHex(hex, factor = 0.82) {
+    const r = Math.round(parseInt(hex.slice(1,3), 16) * factor);
+    const g = Math.round(parseInt(hex.slice(3,5), 16) * factor);
+    const b = Math.round(parseInt(hex.slice(5,7), 16) * factor);
+    return '#' + [r,g,b].map(v => Math.min(255,v).toString(16).padStart(2,'0')).join('');
+  }
+
+  // ── VALIDATION ────────────────────────────────────────────────────────────────
+  function validate() {
+    const errs = [];
+    if (!document.getElementById('cfg-app-name').value.trim()) errs.push('Site name is required.');
+    if (!document.getElementById('cfg-repo-name').value.trim()) errs.push('Repo name is required.');
+    if (!document.getElementById('cfg-noun').value.trim()) errs.push('Item noun (singular) is required.');
+    if (!document.getElementById('cfg-noun-plural').value.trim()) errs.push('Item noun (plural) is required.');
+    if (!document.getElementById('cfg-field1').value.trim()) errs.push('Required field label is required.');
+    if (getPasscodes().length === 0) errs.push('At least one admin passcode is required.');
+    if (!document.getElementById('cfg-pat').value.trim()) errs.push('GitHub PAT is required.');
+    if (PLATFORM_SUPABASE_URL.startsWith('REPLACE_')) errs.push('Platform Supabase URL not configured.');
+    if (PROFESSOR_CHAOS_URL.startsWith('REPLACE_')) errs.push('Professor Chaos Pages URL not configured.');
+    return errs;
+  }
+
+  // ── GENERATE FLOW ─────────────────────────────────────────────────────────────
+  async function runGenerate() {
+    const errs = validate();
+    if (errs.length) {
+      showStatus('err', errs.map(e => `• ${e}`).join('<br>'));
+      return;
+    }
+
+    const btn = document.getElementById('generate-btn');
+    btn.disabled = true;
+
+    const config = {
+      appName:      document.getElementById('cfg-app-name').value.trim(),
+      repoName:     document.getElementById('cfg-repo-name').value.trim(),
+      itemNoun:     document.getElementById('cfg-noun').value.trim(),
+      itemNounPlural: document.getElementById('cfg-noun-plural').value.trim(),
+      field1Label:  document.getElementById('cfg-field1').value.trim(),
+      field2Label:  document.getElementById('cfg-field2').value.trim(),
+      color:        document.getElementById('cfg-color').value,
+      colorDark:    darkenHex(document.getElementById('cfg-color').value),
+      openDay:      document.getElementById('cfg-open-day').value,
+      closeDay:     document.getElementById('cfg-close-day').value,
+      recency:      document.getElementById('cfg-recency').checked,
+      passcodes:    getPasscodes(),
+      faceUrl:      document.getElementById('cfg-face-url').value.trim(),
+    };
+    const pat = document.getElementById('cfg-pat').value.trim();
+
+    const steps = [
+      { id: 'step-slot',   label: 'Claim a slot from the platform' },
+      { id: 'step-build',  label: 'Build site HTML from template' },
+      { id: 'step-user',   label: 'Verify GitHub token' },
+      { id: 'step-repo',   label: 'Create GitHub repository' },
+      { id: 'step-push',   label: 'Push index.html to repo' },
+      { id: 'step-pages',  label: 'Enable GitHub Pages' },
+      { id: 'step-urls',   label: 'Save URLs to registry' },
+    ];
+
+    document.getElementById('generate-status').innerHTML = `
+      <div class="form-section" style="margin-top:1rem">
+        <h3>Deploying...</h3>
+        <ul class="step-list">
+          ${steps.map(s => `<li id="${s.id}"><span class="step-icon">⏳</span>${s.label}</li>`).join('')}
+        </ul>
+        <div id="final-result" style="margin-top:1rem"></div>
+      </div>`;
+
+    const setStep = (id, state, extra = '') => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      const icons = { doing: '⏳', done: '✅', fail: '❌' };
+      el.className = state;
+      el.innerHTML = `<span class="step-icon">${icons[state]}</span>${steps.find(s=>s.id===id)?.label || ''}${extra}`;
+    };
+
+    let slot, owner, repoName, liveUrl;
+
+    try {
+      // 1. Claim slot
+      setStep('step-slot', 'doing');
+      const { data: slotData, error: slotErr } = await db.rpc('claim_slot', {
+        p_app_name: config.appName,
+        p_config: config
+      });
+      if (slotErr) throw new Error('Slot claim failed: ' + slotErr.message);
+      slot = slotData[0];
+      setStep('step-slot', 'done', ` — <code>${slot.slot_name}</code>`);
+
+      // 2. Build HTML
+      setStep('step-build', 'doing');
+      const html = await buildSiteHtml(config, slot.slot_name);
+      setStep('step-build', 'done');
+
+      // 3. Get GitHub user
+      setStep('step-user', 'doing');
+      const userResp = await ghFetch('https://api.github.com/user', pat);
+      if (!userResp.ok) throw new Error('GitHub token invalid or missing repo scope.');
+      const userData = await userResp.json();
+      owner = userData.login;
+      repoName = config.repoName;
+      setStep('step-user', 'done', ` — @${owner}`);
+
+      // 4. Create repo
+      setStep('step-repo', 'doing');
+      const repoResp = await ghFetch('https://api.github.com/user/repos', pat, {
+        method: 'POST',
+        body: JSON.stringify({ name: repoName, private: false, auto_init: false, description: config.appName })
+      });
+      if (!repoResp.ok) {
+        const err = await repoResp.json();
+        throw new Error('Repo creation failed: ' + (err.message || repoResp.status));
+      }
+      setStep('step-repo', 'done', ` — ${owner}/${repoName}`);
+
+      // 5. Push file
+      setStep('step-push', 'doing');
+      await new Promise(r => setTimeout(r, 1500)); // let repo initialize
+      const content = btoa(unescape(encodeURIComponent(html)));
+      const pushResp = await ghFetch(`https://api.github.com/repos/${owner}/${repoName}/contents/index.html`, pat, {
+        method: 'PUT',
+        body: JSON.stringify({ message: 'Initial site', content })
+      });
+      if (!pushResp.ok) {
+        const err = await pushResp.json();
+        throw new Error('File push failed: ' + (err.message || pushResp.status));
+      }
+      setStep('step-push', 'done');
+
+      // 6. Enable Pages
+      setStep('step-pages', 'doing');
+      await new Promise(r => setTimeout(r, 1000));
+      const pagesResp = await ghFetch(`https://api.github.com/repos/${owner}/${repoName}/pages`, pat, {
+        method: 'POST',
+        body: JSON.stringify({ source: { branch: 'main', path: '/' } })
+      });
+      if (!pagesResp.ok && pagesResp.status !== 409) {
+        const err = await pagesResp.json();
+        throw new Error('Pages enable failed: ' + (err.message || pagesResp.status));
+      }
+      liveUrl = `https://${owner}.github.io/${repoName}/`;
+      setStep('step-pages', 'done', ` — ${liveUrl}`);
+
+      // 7. Save URLs
+      setStep('step-urls', 'doing');
+      await db.rpc('update_slot_urls', {
+        p_slot_name: slot.slot_name,
+        p_github_repo: `https://github.com/${owner}/${repoName}`,
+        p_live_url: liveUrl
+      });
+      setStep('step-urls', 'done');
+
+      document.getElementById('final-result').innerHTML = `
+        <div class="alert ok">
+          ✅ <strong>${escHtml(config.appName)}</strong> deployed to slot <code>${slot.slot_name}</code><br>
+          🌐 <a href="${escHtml(liveUrl)}" target="_blank" style="color:#86efac">${escHtml(liveUrl)}</a>
+          <span style="font-size:0.76rem;display:block;margin-top:6px;color:#4ade80">GitHub Pages takes ~60 seconds to go live.</span>
+        </div>`;
+
+      loadRegistry();
+      updateSlotCounter();
+
+    } catch (err) {
+      // Roll back slot if GitHub steps failed after claiming
+      if (slot && !liveUrl) {
+        await db.rpc('release_slot', { p_slot_name: slot.slot_name }).catch(() => {});
+      }
+      const failingStep = !slot ? 'step-slot' : !owner ? 'step-user' : !repoName ? 'step-repo' : 'step-push';
+      setStep(failingStep, 'fail');
+      document.getElementById('final-result').innerHTML = `<div class="alert err">❌ ${escHtml(err.message)}</div>`;
+    }
+
+    btn.disabled = false;
+  }
+
+  function ghFetch(url, pat, opts = {}) {
+    return fetch(url, {
+      ...opts,
+      headers: {
+        'Authorization': `Bearer ${pat}`,
+        'Accept': 'application/vnd.github+json',
+        'Content-Type': 'application/json',
+        ...(opts.headers || {})
+      }
+    });
+  }
+
+  // ── BUILD SITE HTML ───────────────────────────────────────────────────────────
+  async function buildSiteHtml(config, schemaName) {
+    const resp = await fetch('./template.html');
+    if (!resp.ok) throw new Error('Could not fetch template.html');
+    let html = await resp.text();
+
+    const encodedPasscodes = JSON.stringify(config.passcodes.map(encodePasscode));
+    const chaosJsUrl = `${PROFESSOR_CHAOS_URL.replace(/\/$/, '')}/chaos.js`;
+
+    const tokens = {
+      '__SUPABASE_URL__':         PLATFORM_SUPABASE_URL,
+      '__SUPABASE_ANON_KEY__':    PLATFORM_SUPABASE_ANON_KEY,
+      '__SCHEMA__':               schemaName,
+      '__APP_NAME__':             config.appName,
+      '__ITEM_NOUN__':            config.itemNoun,
+      '__ITEM_NOUN_PLURAL__':     config.itemNounPlural,
+      '__ITEM_NOUN_CAP__':        config.itemNoun.charAt(0).toUpperCase() + config.itemNoun.slice(1),
+      '__FIELD1_LABEL__':         config.field1Label,
+      '__FIELD2_LABEL__':         config.field2Label,
+      '__PRIMARY_COLOR__':        config.color,
+      '__PRIMARY_COLOR_DARK__':   config.colorDark,
+      '__BALLOT_OPEN_DAY__':      config.openDay === 'null' ? 'null' : config.openDay,
+      '__BALLOT_CLOSE_DAY__':     config.closeDay === 'null' ? 'null' : config.closeDay,
+      '__RECENCY_WEIGHT__':       config.recency ? 'true' : 'false',
+      '__ADMIN_ENCODED__':        encodedPasscodes,
+      '__CHAOS_JS_URL__':         chaosJsUrl,
+      '__FACE_IMAGE_URL__':       config.faceUrl,
+    };
+
+    for (const [token, value] of Object.entries(tokens)) {
+      html = html.split(token).join(value);
+    }
+    return html;
+  }
+
+  // ── REGISTRY ─────────────────────────────────────────────────────────────────
+  async function loadRegistry() {
+    const el = document.getElementById('registry-content');
+    if (!el) return;
+    el.innerHTML = '<div class="loading">Loading...</div>';
+
+    const { data, error } = await db.from('slot_registry').select('*').order('slot_name');
+    if (error) { el.innerHTML = `<div class="alert err">${escHtml(error.message)}</div>`; return; }
+
+    const used  = data.filter(s => !s.is_available).length;
+    const total = data.length;
+    document.getElementById('slot-counter').textContent = `${used} / ${total} slots used`;
+
+    el.innerHTML = `
+      <div class="form-section">
+        <h3>Slot Registry (${used}/${total} used)</h3>
+        <table class="reg-table">
+          <thead><tr>
+            <th>Slot</th><th>App</th><th>Live URL</th><th>Claimed</th><th></th>
+          </tr></thead>
+          <tbody>
+            ${data.map(s => `
+              <tr>
+                <td><span class="slot-name">${escHtml(s.slot_name)}</span></td>
+                <td>${s.app_name ? escHtml(s.app_name) : `<span class="avail-dot green"></span>Available`}</td>
+                <td class="slot-url">${s.live_url ? `<a href="${escHtml(s.live_url)}" target="_blank">${escHtml(s.live_url)}</a>` : '—'}</td>
+                <td style="font-size:0.75rem;color:#64748b">${s.claimed_at ? new Date(s.claimed_at).toLocaleDateString() : '—'}</td>
+                <td>${!s.is_available ? `<button class="btn danger sm" onclick="releaseSlot('${escHtml(s.slot_name)}')">Release</button>` : ''}</td>
+              </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>`;
+  }
+
+  async function releaseSlot(slotName) {
+    if (!confirm(`Release ${slotName}? This will DELETE all data in that site and make the slot available again.`)) return;
+    const { error } = await db.rpc('release_slot', { p_slot_name: slotName });
+    if (error) { showFlash('Release failed: ' + error.message, 'err'); return; }
+    showFlash(`${slotName} released.`, 'ok');
+    loadRegistry();
+    updateSlotCounter();
+  }
+
+  async function updateSlotCounter() {
+    const { data } = await db.from('slot_registry').select('is_available');
+    if (!data) return;
+    const used = data.filter(s => !s.is_available).length;
+    document.getElementById('slot-counter').textContent = `${used} / ${data.length} slots used`;
+  }
+
+  // ── CHAOS CONFIG GRID ─────────────────────────────────────────────────────────
+  const CHAOS_LABELS = {
+    premStrip:       'Premium upsell strip',
+    bannerAd:        'Rotating SaaS banner ad',
+    cookieBanner:    'Cookie consent (runaway Reject)',
+    millionthUser:   '"1,000,000th user" popup',
+    fakeActivity:    'Fake activity toasts',
+    survey:          'Infinite fake survey',
+    ballotAds:       'Ballot ads + SPONSORED badge',
+    geoChaos:        'Full GeoCities mode (gutters)',
+    cat:             'Cursor-stalking cat',
+    face:            'Photo that trails the cat',
+    exitIntent:      'Exit intent popup',
+    titleFlicker:    'Tab title fake alerts',
+    rageClick:       'Rage click snark',
+    fakeNotif:       'Fake notification prompt',
+    progressBar:     'Fake stalling progress bar',
+    faviconBadge:    'Favicon unread badge',
+    truck:           'Semi truck drive-by',
+    midi:            'MIDI music engine',
+    clickBlip:       '8-bit click sounds',
+    fontChaos:       'Font changes on click',
+    infiniteScroll:  'Infinite scroll clone',
+    subwaySurfers:   'Subway Surfers iframe',
+    reportButton:    '"Report a Problem" runner',
+  };
+
+  function renderChaosGrid() {
+    const el = document.getElementById('chaos-grid');
+    el.innerHTML = Object.entries(CHAOS_LABELS).map(([key, label]) => `
+      <div class="toggle-row">
+        <label style="font-size:0.82rem">${label}</label>
+        <span style="font-size:0.7rem;color:#475569;font-family:monospace">${key}</span>
+      </div>`).join('');
+  }
+
+  // ── UTILS ─────────────────────────────────────────────────────────────────────
+  function showStatus(type, msg) {
+    document.getElementById('generate-status').innerHTML = `<div class="alert ${type}" style="margin-top:1rem">${msg}</div>`;
+  }
+
+  function showFlash(msg, type = 'info') {
+    const el = document.getElementById('flash');
+    el.innerHTML = `<div class="alert ${type}" style="margin-bottom:1rem">${escHtml(msg)}</div>`;
+    setTimeout(() => { el.innerHTML = ''; }, 4000);
+  }
+
+  function escHtml(str) {
+    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  // Focus passphrase on load
+  document.getElementById('passphrase-input').focus();
+</script>
+</body>
+</html>

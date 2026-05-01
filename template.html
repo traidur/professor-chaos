@@ -1,0 +1,892 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>__APP_NAME__</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    :root {
+      --accent: __PRIMARY_COLOR__;
+      --accent-dark: __PRIMARY_COLOR_DARK__;
+      --bg: #f4f6f9;
+      --surface: #ffffff;
+      --border: #e1e5eb;
+      --text: #1c2130;
+      --muted: #6b7280;
+      --shadow: 0 2px 8px rgba(0,0,0,0.07);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body, html { font-family: system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--text); }
+
+    .app-header {
+      background: #1a2035;
+      color: white;
+      padding: 0.9rem 1.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 3px solid var(--accent);
+    }
+    .app-header h1 { font-size: 1.2rem; font-weight: 700; letter-spacing: -0.02em; }
+
+    .identity-wrap { display: flex; align-items: center; gap: 0.5rem; font-size: 0.8rem; color: #94a3b8; }
+    .identity-wrap input {
+      padding: 0.3rem 0.7rem;
+      border: 1px solid #2d3a52;
+      border-radius: 20px;
+      font-size: 0.8rem;
+      width: 145px;
+      background: #0f172a;
+      color: white;
+    }
+    .identity-wrap input:focus { outline: none; border-color: var(--accent); }
+    .identity-wrap input::placeholder { color: #475569; }
+
+    nav {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      padding: 0 1rem;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    }
+    nav button {
+      background: none;
+      border: none;
+      border-bottom: 3px solid transparent;
+      color: var(--muted);
+      padding: 0.8rem 1.2rem;
+      cursor: pointer;
+      font-size: 0.875rem;
+      font-weight: 500;
+      transition: all 0.15s;
+      margin-bottom: -1px;
+    }
+    nav button:hover { color: var(--text); }
+    nav button.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
+
+    main { max-width: 700px; margin: 1.75rem auto; padding: 0 1rem; }
+    .tab-pane { display: none; }
+    .tab-pane.active { display: block; }
+
+    /* BUTTONS */
+    .btn {
+      background: var(--accent);
+      color: white;
+      border: none;
+      padding: 0.5rem 1.1rem;
+      border-radius: 20px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      font-weight: 600;
+      transition: background 0.15s;
+      white-space: nowrap;
+    }
+    .btn:hover { background: var(--accent-dark); }
+    .btn:disabled { background: #cbd5e1; cursor: not-allowed; }
+    .btn.ghost { background: transparent; border: 1.5px solid var(--border); color: var(--muted); border-radius: 20px; }
+    .btn.ghost:hover { border-color: var(--muted); color: var(--text); background: transparent; }
+    .btn.danger { background: #ef4444; }
+    .btn.danger:hover { background: #dc2626; }
+    .btn.sm { padding: 0.28rem 0.7rem; font-size: 0.775rem; }
+    .btn-row { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+
+    /* CARDS */
+    .card {
+      background: var(--surface);
+      border-radius: 12px;
+      padding: 1rem 1.2rem;
+      margin-bottom: 0.75rem;
+      box-shadow: var(--shadow);
+      border: 1.5px solid transparent;
+    }
+
+    /* ITEM CARD (voting) */
+    .item-card {
+      cursor: pointer;
+      padding: 0;
+      overflow: hidden;
+      transition: border-color 0.15s, transform 0.1s, box-shadow 0.15s;
+    }
+    .item-card:hover:not(.locked) {
+      border-color: var(--accent);
+      transform: translateY(-1px);
+      box-shadow: 0 5px 18px rgba(0,0,0,0.1);
+    }
+    .item-card.my-pick { border-color: var(--accent); }
+    .item-card.my-pick .item-body { background: color-mix(in srgb, var(--accent) 5%, white); }
+    .item-card.champion { border-color: #10b981; }
+    .item-card.champion .item-body { background: #f0fdf4; }
+    .item-card.locked { cursor: default; }
+
+    @keyframes shimmer {
+      0% { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
+    .item-img-wrap {
+      position: relative; width: 100%; height: 185px;
+      background: linear-gradient(90deg, #e2e8f0 25%, #f1f5f9 50%, #e2e8f0 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.5s infinite;
+      overflow: hidden;
+    }
+    .item-img {
+      position: absolute; inset: 0; width: 100%; height: 100%;
+      object-fit: cover; display: block; opacity: 0; transition: opacity 0.4s;
+    }
+    .item-img.ready { opacity: 1; }
+
+    .item-body {
+      padding: 1rem 1.2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+    }
+    .item-name { font-weight: 600; font-size: 1rem; }
+    .item-sub { font-size: 0.8rem; color: var(--muted); margin-top: 3px; }
+    .item-tag { font-size: 0.72rem; color: var(--accent); margin-top: 3px; }
+
+    .champ-badge {
+      display: inline-block;
+      background: #d1fae5; color: #065f46;
+      padding: 0.15rem 0.55rem; border-radius: 20px;
+      font-size: 0.66rem; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.05em;
+      margin-left: 6px; vertical-align: middle;
+    }
+
+    /* TALLY */
+    .tally-wrap { min-width: 145px; text-align: right; }
+    .tally-count { font-size: 0.78rem; color: var(--muted); margin-bottom: 4px; }
+    .tally-names { color: #94a3b8; font-style: italic; }
+    .tally-bar { height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; margin-top: 4px; }
+    .tally-bar-fill { height: 100%; background: var(--accent); border-radius: 3px; transition: width 0.4s; }
+    .tally-hint { font-size: 0.68rem; color: #94a3b8; margin-top: 4px; }
+
+    /* TIE */
+    @keyframes tiepulse {
+      from { box-shadow: 0 0 8px rgba(239,68,68,0.5); }
+      to   { box-shadow: 0 0 24px rgba(239,68,68,0.9); transform: scale(1.012); }
+    }
+    .tie-banner {
+      background: linear-gradient(135deg, #7f1d1d, #dc2626, #7f1d1d);
+      color: white; font-weight: 900; text-align: center; font-size: 0.9rem;
+      padding: 0.9rem; border-radius: 10px; margin-bottom: 1rem;
+      animation: tiepulse 0.65s infinite alternate;
+      letter-spacing: 0.07em; text-transform: uppercase;
+    }
+
+    /* WINNER MODAL */
+    .result-modal {
+      display: none; position: fixed; inset: 0;
+      background: rgba(15,23,42,0.92); z-index: 1000;
+      align-items: center; justify-content: center; padding: 2rem;
+    }
+    .result-modal.open { display: flex; }
+    .result-modal-inner {
+      background: white; border-radius: 16px; overflow: hidden;
+      max-width: 460px; width: 100%; text-align: center;
+    }
+    .result-modal-img-wrap {
+      position: relative; width: 100%; height: 290px;
+      background: linear-gradient(90deg, #e2e8f0 25%, #f1f5f9 50%, #e2e8f0 75%);
+      background-size: 200% 100%; animation: shimmer 1.5s infinite; overflow: hidden;
+    }
+    .result-modal-img {
+      position: absolute; inset: 0; width: 100%; height: 100%;
+      object-fit: cover; display: block; opacity: 0; transition: opacity 0.4s;
+    }
+    .result-modal-img.ready { opacity: 1; }
+    .result-modal-body { padding: 1.5rem; }
+    .result-modal-name { font-size: 1.7rem; font-weight: 800; margin-bottom: 0.4rem; letter-spacing: -0.02em; }
+    .result-modal-sub { color: var(--muted); margin-bottom: 1.25rem; font-size: 0.875rem; }
+
+    /* ALERTS */
+    .alert {
+      padding: 0.7rem 1rem; border-radius: 8px;
+      margin-bottom: 1rem; font-size: 0.84rem; border-left: 4px solid;
+    }
+    .alert.warn { background: #fffbeb; border-color: #f59e0b; color: #78350f; }
+    .alert.info { background: #eff6ff; border-color: #3b82f6; color: #1e3a8a; }
+    .alert.ok   { background: #f0fdf4; border-color: #10b981; color: #064e3b; }
+    .alert.err  { background: #fef2f2; border-color: #ef4444; color: #7f1d1d; }
+
+    /* SECTION HEADER */
+    .section-hd { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+    .section-hd h2 { font-size: 1.05rem; font-weight: 700; }
+
+    /* FORM */
+    .add-form {
+      background: var(--surface); border-radius: 12px; padding: 1.2rem;
+      box-shadow: var(--shadow); margin-bottom: 1.25rem; border: 1.5px solid var(--border);
+    }
+    .add-form h3 { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); margin-bottom: 0.9rem; }
+    .field-group { margin-bottom: 0.7rem; }
+    .field-group label { display: block; font-size: 0.79rem; font-weight: 600; margin-bottom: 0.25rem; color: var(--muted); }
+    .field-group input {
+      width: 100%; padding: 0.5rem 0.75rem;
+      border: 1.5px solid var(--border); border-radius: 8px;
+      font-size: 0.9rem; font-family: inherit; background: var(--bg);
+    }
+    .field-group input:focus { outline: none; border-color: var(--accent); background: white; }
+
+    /* NOMINEE CARD (pool) */
+    .nominee-card { display: flex; justify-content: space-between; align-items: center; gap: 1rem; }
+    .nominee-name { font-weight: 600; font-size: 0.95rem; }
+    .nominee-sub { font-size: 0.78rem; color: var(--muted); margin-top: 2px; }
+    .nominee-meta { font-size: 0.7rem; color: #94a3b8; margin-top: 2px; }
+
+    /* RESULT CARD (history) */
+    .result-card { display: flex; justify-content: space-between; align-items: center; }
+    .result-date { font-size: 0.75rem; color: var(--muted); margin-top: 3px; }
+
+    /* MISC */
+    .voters-line { font-size: 0.75rem; color: #94a3b8; margin-top: 0.6rem; }
+    .empty { text-align: center; padding: 3rem; color: var(--muted); }
+    .empty p { margin-bottom: 1rem; }
+    .loading { text-align: center; padding: 2rem; color: var(--muted); font-size: 0.9rem; }
+    .hint { font-size: 0.7rem; color: #94a3b8; margin-top: 3px; }
+  </style>
+</head>
+<body>
+
+<header class="app-header">
+  <h1>__APP_NAME__</h1>
+  <div class="identity-wrap">
+    Who are you?
+    <input type="text" id="voter-input" placeholder="Your name" maxlength="50">
+  </div>
+</header>
+
+<nav>
+  <button class="active" data-tab="round" onclick="switchTab(this)">Current Round</button>
+  <button data-tab="nominees" onclick="switchTab(this)">Nominees</button>
+  <button data-tab="archives" onclick="switchTab(this)">Past Results</button>
+  <button id="ctrl-tab-btn" data-tab="ctrl" onclick="switchTab(this)" style="display:none">Control Room</button>
+</nav>
+
+<main>
+  <div id="flash-area"></div>
+
+  <div id="tab-round" class="tab-pane active">
+    <div id="round-container"><div class="loading">Loading...</div></div>
+  </div>
+
+  <div id="tab-nominees" class="tab-pane">
+    <form class="add-form" id="add-form">
+      <h3>Submit a __ITEM_NOUN_CAP__</h3>
+      <div class="field-group">
+        <label>__FIELD1_LABEL__</label>
+        <input id="new-name" type="text" placeholder="Name" required maxlength="100">
+      </div>
+      <div class="field-group" id="field2-group">
+        <label id="field2-label">__FIELD2_LABEL__</label>
+        <input id="new-field2" type="text" maxlength="200">
+      </div>
+      <button type="submit" class="btn">Add __ITEM_NOUN_CAP__</button>
+    </form>
+    <div id="nominees-list"><div class="loading">Loading...</div></div>
+  </div>
+
+  <div id="tab-archives" class="tab-pane">
+    <div class="section-hd"><h2>Past Results</h2></div>
+    <div id="archives-list"><div class="loading">Loading...</div></div>
+  </div>
+
+  <div id="tab-ctrl" class="tab-pane">
+    <div class="section-hd"><h2>Control Room</h2></div>
+    <div id="ctrl-votes"><div class="loading">Loading...</div></div>
+    <div id="ctrl-chaos"></div>
+  </div>
+</main>
+
+<footer style="text-align:center;padding:14px;font-size:0.68rem;color:#aaa;border-top:1px solid var(--border);margin-top:2rem">
+  __APP_NAME__ &copy; 2025
+</footer>
+
+<div id="result-modal" class="result-modal" onclick="this.classList.remove('open')">
+  <div class="result-modal-inner" onclick="event.stopPropagation()">
+    <div class="result-modal-img-wrap">
+      <img id="result-modal-img" class="result-modal-img" alt="winner">
+    </div>
+    <div class="result-modal-body">
+      <div class="result-modal-name" id="result-modal-name"></div>
+      <div class="result-modal-sub">We have a winner!</div>
+      <button class="btn" onclick="document.getElementById('result-modal').classList.remove('open')">
+        Let's go!
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ── CONFIG ──────────────────────────────────────────────────────────────────
+  const SUPABASE_URL      = '__SUPABASE_URL__';
+  const SUPABASE_ANON_KEY = '__SUPABASE_ANON_KEY__';
+  const SCHEMA            = '__SCHEMA__';
+  const APP_NAME          = '__APP_NAME__';
+  const ITEM_NOUN         = '__ITEM_NOUN__';
+  const ITEM_NOUN_PLURAL  = '__ITEM_NOUN_PLURAL__';
+  const ITEM_NOUN_CAP     = ITEM_NOUN.charAt(0).toUpperCase() + ITEM_NOUN.slice(1);
+  const FIELD1_LABEL      = '__FIELD1_LABEL__';
+  const FIELD2_LABEL      = '__FIELD2_LABEL__';
+  const BALLOT_OPEN_DAY   = __BALLOT_OPEN_DAY__;
+  const BALLOT_CLOSE_DAY  = __BALLOT_CLOSE_DAY__;
+  const RECENCY_WEIGHT    = __RECENCY_WEIGHT__;
+  // ────────────────────────────────────────────────────────────────────────────
+
+  const { createClient } = supabase;
+  const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { db: { schema: SCHEMA } });
+
+  // Hide field2 if not configured
+  if (!FIELD2_LABEL) document.getElementById('field2-group').style.display = 'none';
+
+  // Voter name
+  const voterInput = document.getElementById('voter-input');
+  voterInput.value = localStorage.getItem('voterName') || '';
+  voterInput.addEventListener('change', () => {
+    localStorage.setItem('voterName', voterInput.value.trim());
+    document.getElementById('ctrl-tab-btn').style.display = isKeymaster() ? '' : 'none';
+  });
+  const voterName = () => voterInput.value.trim();
+
+  // Stable device ID (one vote per browser)
+  const deviceId = (() => {
+    let id = localStorage.getItem('deviceId');
+    if (!id) { id = crypto.randomUUID(); localStorage.setItem('deviceId', id); }
+    return id;
+  })();
+
+  // ── KEYMASTER (admin) ────────────────────────────────────────────────────────
+  const _km = __ADMIN_ENCODED__;
+  const _kd = e => e.map((h, i) => String.fromCharCode((parseInt(h, 16) ^ 83) - i * 5)).reverse().join('');
+  const isKeymaster = () => _km.some(e => _kd(e) === voterName().toLowerCase());
+  const maskName = name => isKeymaster() && _km.some(e => _kd(e) === name.toLowerCase())
+    ? name.replace(/./g, () => String.fromCharCode(97 + Math.floor(Math.random() * 26)))
+    : escHtml(name);
+
+  const todayDow = () => new Date().getDay();
+  const canStartRound  = () => isKeymaster() || (BALLOT_OPEN_DAY  !== null && todayDow() === BALLOT_OPEN_DAY);
+  const canLockRound   = () => isKeymaster() || (BALLOT_CLOSE_DAY !== null && todayDow() === BALLOT_CLOSE_DAY);
+
+  // ── AI IMAGES ────────────────────────────────────────────────────────────────
+  let _cache = {};
+
+  async function ensureSeeds(items) {
+    const missing = items.filter(r => !r.image_seed);
+    for (const r of missing) {
+      const seed = Math.floor(Math.random() * 9999999) + 1;
+      await db.from('items').update({ image_seed: seed }).eq('id', r.id);
+      r.image_seed = seed;
+    }
+  }
+
+  function itemImageUrl(r) {
+    const prompt = encodeURIComponent(
+      `high quality image of a made-up realistic looking mascot for ${r.name}, wearing branded merchandise from ${r.name}, standing in front of the ${r.name} ${ITEM_NOUN} with a large banner displaying the name ${r.name}, photorealistic, detailed, vibrant`
+    );
+    return `https://image.pollinations.ai/prompt/${prompt}?seed=${r.image_seed}&width=600&height=380&nologo=true&model=flux`;
+  }
+
+  function loadImages(items) {
+    items.forEach(r => {
+      const img = document.getElementById(`img-${r.id}`);
+      if (!img) return;
+      const url = r.image_url || itemImageUrl(r);
+      const giveUp = setTimeout(() => {
+        const wrap = img.closest('.item-img-wrap');
+        if (wrap && !img.classList.contains('ready')) wrap.style.display = 'none';
+      }, 20000);
+      img.onload = () => {
+        clearTimeout(giveUp);
+        img.classList.add('ready');
+        if (!r.image_url) {
+          db.from('items').update({ image_url: url }).eq('id', r.id);
+          r.image_url = url;
+        }
+      };
+      img.onerror = () => { const s = img.src; img.removeAttribute('src'); setTimeout(() => img.src = s, 4000); };
+      img.src = url;
+    });
+  }
+
+  function showResultModal(itemId) {
+    const r = _cache[itemId];
+    if (!r) return;
+    document.getElementById('result-modal-name').textContent = r.name;
+    document.getElementById('result-modal').classList.add('open');
+    const img = document.getElementById('result-modal-img');
+    const url = r.image_url || itemImageUrl(r);
+    img.onload = () => img.classList.add('ready');
+    img.onerror = () => { const s = img.src; img.removeAttribute('src'); setTimeout(() => img.src = s, 4000); };
+    img.src = url;
+  }
+
+  // ── TABS ─────────────────────────────────────────────────────────────────────
+  function switchTab(btn) {
+    document.querySelectorAll('.tab-pane').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('nav button').forEach(el => el.classList.remove('active'));
+    const tab = btn.dataset.tab;
+    document.getElementById(`tab-${tab}`).classList.add('active');
+    btn.classList.add('active');
+    if (tab === 'round')    loadRound();
+    if (tab === 'nominees') loadNominees();
+    if (tab === 'archives') loadArchives();
+    if (tab === 'ctrl')     loadCtrl();
+  }
+
+  // ── FLASH ─────────────────────────────────────────────────────────────────────
+  let _flashTimer;
+  function flash(msg, type = 'info') {
+    clearTimeout(_flashTimer);
+    document.getElementById('flash-area').innerHTML = `<div class="alert ${type}">${msg}</div>`;
+    _flashTimer = setTimeout(() => { document.getElementById('flash-area').innerHTML = ''; }, 4000);
+  }
+
+  // ── CURRENT ROUND ─────────────────────────────────────────────────────────────
+  async function loadRound() {
+    const el = document.getElementById('round-container');
+    el.innerHTML = '<div class="loading">Loading...</div>';
+
+    const { data: ballots, error } = await db
+      .from('ballots')
+      .select('*, ballot_options(item_id, items(id, name, field2, image_seed, image_url))')
+      .order('created_at', { ascending: false })
+      .limit(1);
+
+    if (error) { el.innerHTML = `<div class="alert err">Error: ${escHtml(error.message)}</div>`; return; }
+    if (!ballots || ballots.length === 0) { renderNoRound(el); return; }
+
+    const ballot = ballots[0];
+    const items = ballot.ballot_options.map(o => o.items);
+    await ensureSeeds(items);
+    items.forEach(r => { _cache[r.id] = r; });
+
+    const { data: votes } = await db.from('votes').select('item_id, voter_name, device_id').eq('ballot_id', ballot.id);
+    renderRound(el, ballot, votes || []);
+    loadImages(items);
+  }
+
+  function preOpenBanner() {
+    if (BALLOT_OPEN_DAY === null) return '';
+    const dow = todayDow();
+    const days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+    if (dow === BALLOT_OPEN_DAY || dow === BALLOT_CLOSE_DAY) return '';
+    return `<div class="alert info">Add your nominees now — voting opens ${days[BALLOT_OPEN_DAY]}.</div>`;
+  }
+
+  function renderNoRound(el) {
+    el.innerHTML = `
+      ${preOpenBanner()}
+      <div class="empty">
+        <p>No active round yet.</p>
+        ${canStartRound()
+          ? `<button class="btn" onclick="startRound()">Start a Round</button>`
+          : `<p style="color:#94a3b8;font-size:0.82rem">Check back when voting opens.</p>`
+        }
+      </div>`;
+  }
+
+  function renderRound(el, ballot, votes) {
+    const myVote = votes.find(v => v.device_id === deviceId);
+    const counts = {}, votersByItem = {};
+    ballot.ballot_options.forEach(o => { counts[o.item_id] = 0; votersByItem[o.item_id] = []; });
+    votes.forEach(v => {
+      counts[v.item_id] = (counts[v.item_id] || 0) + 1;
+      votersByItem[v.item_id].push(v.voter_name);
+    });
+    const maxCount = Math.max(...Object.values(counts), 1);
+    const isTie = !!ballot.title;
+    const roundTitle = ballot.title || 'Current Round';
+
+    let html = `<div class="section-hd"><h2>${escHtml(roundTitle)}</h2><div class="btn-row">`;
+    if (!ballot.closed && canLockRound())  html += `<button class="btn ghost sm" onclick="lockRound('${ballot.id}')">Lock In</button>`;
+    if (canStartRound())                   html += `<button class="btn sm" onclick="startRound()">New Round</button>`;
+    html += `</div></div>`;
+
+    if (isTie && !ballot.closed) html += `<div class="tie-banner">⚡ ${escHtml(roundTitle)} ⚡</div>`;
+    if (ballot.closed) {
+      html += `<div class="alert warn">This round is closed.${ballot.winner_id ? ' Winner declared below.' : ''}</div>`;
+      html += preOpenBanner();
+    }
+    if (!voterName() && !ballot.closed) html += `<div class="alert info">Enter your name above to cast a vote.</div>`;
+
+    html += ballot.ballot_options.map(opt => {
+      const r = opt.items;
+      const count = counts[r.id] || 0;
+      const isMyPick = myVote && myVote.item_id === r.id;
+      const isChamp  = ballot.winner_id === r.id;
+      const pct      = Math.round((count / maxCount) * 100);
+      const canVote  = !ballot.closed && voterName();
+
+      let cls = 'card item-card';
+      if (isMyPick) cls += ' my-pick';
+      if (isChamp)  cls += ' champion';
+      if (ballot.closed) cls += ' locked';
+
+      const onClick = canVote ? `onclick="placeVote('${ballot.id}', '${r.id}')"` : '';
+      const declareBtn = !ballot.closed && myVote && !ballot.winner_id && isKeymaster()
+        ? `<button class="btn sm" style="margin-top:6px" onclick="event.stopPropagation();declareWinner('${ballot.id}','${r.id}')">Declare Winner</button>`
+        : '';
+
+      return `
+        <div class="${cls}" ${onClick}>
+          <div class="item-img-wrap">
+            <img id="img-${r.id}" class="item-img${r.image_url ? ' ready' : ''}" ${r.image_url ? `src="${escHtml(r.image_url)}"` : ''} alt="${escHtml(r.name)}">
+          </div>
+          <div class="item-body">
+            <div>
+              <div class="item-name">${escHtml(r.name)}${isChamp ? '<span class="champ-badge">Winner</span>' : ''}</div>
+              ${r.field2 && FIELD2_LABEL ? `<div class="item-sub">${escHtml(r.field2)}</div>` : ''}
+              ${isMyPick ? `<div class="item-tag">&#10003; your pick</div>` : ''}
+            </div>
+            <div class="tally-wrap">
+              <div class="tally-count">${count} vote${count !== 1 ? 's' : ''}${votersByItem[r.id].length ? ` <span class="tally-names">(${votersByItem[r.id].map(maskName).join(', ')})</span>` : ''}</div>
+              <div class="tally-bar"><div class="tally-bar-fill" style="width:${pct}%"></div></div>
+              ${canVote && !myVote ? '<div class="tally-hint">click to vote</div>' : ''}
+              ${declareBtn}
+            </div>
+          </div>
+        </div>`;
+    }).join('');
+
+    const allVoters = [...new Set(votes.map(v => v.voter_name))];
+    if (allVoters.length) html += `<div class="voters-line">Voted: ${allVoters.map(maskName).join(', ')}</div>`;
+
+    el.innerHTML = html;
+  }
+
+  async function placeVote(ballotId, itemId) {
+    if (!voterName()) { flash('Enter your name first!', 'err'); return; }
+    const { error } = await db.from('votes').upsert(
+      { ballot_id: ballotId, item_id: itemId, voter_name: voterName(), device_id: deviceId },
+      { onConflict: 'ballot_id,device_id' }
+    );
+    if (error) { flash('Vote failed: ' + escHtml(error.message), 'err'); return; }
+    loadRound();
+  }
+
+  async function declareWinner(ballotId, itemId) {
+    const { error } = await db.from('ballots').update({ closed: true, winner_id: itemId }).eq('id', ballotId);
+    if (error) { flash('Failed to declare winner', 'err'); return; }
+    await db.from('visits').insert({ item_id: itemId, visited_on: new Date().toISOString().split('T')[0] });
+    flash('Winner declared!', 'ok');
+    showResultModal(itemId);
+    loadRound();
+  }
+
+  async function lockRound(ballotId) {
+    const { data: votes } = await db.from('votes').select('item_id').eq('ballot_id', ballotId);
+    if (votes && votes.length > 0) {
+      const counts = {};
+      votes.forEach(v => { counts[v.item_id] = (counts[v.item_id] || 0) + 1; });
+      const maxVotes = Math.max(...Object.values(counts));
+      const tied = Object.keys(counts).filter(id => counts[id] === maxVotes);
+      if (tied.length > 1) {
+        await db.from('ballots').update({ closed: true }).eq('id', ballotId);
+        const { data: tb, error } = await db.from('ballots')
+          .insert({ week_of: nextCycleDate(), closed: false, title: 'TIEBREAKER ROUND' })
+          .select().single();
+        if (error) { flash('Failed to create tiebreaker', 'err'); return; }
+        await db.from('ballot_options').insert(tied.map(id => ({ ballot_id: tb.id, item_id: id })));
+        flash('Tie detected — tiebreaker round started!', 'warn');
+        loadRound();
+        return;
+      }
+    }
+    const { error } = await db.from('ballots').update({ closed: true }).eq('id', ballotId);
+    if (error) { flash('Failed to lock round', 'err'); return; }
+    loadRound();
+  }
+
+  async function startRound() {
+    const { data: items } = await db.from('items').select('*').eq('is_active', true);
+    if (!items || items.length === 0) { flash(`No ${ITEM_NOUN_PLURAL} in the pool yet!`, 'err'); return; }
+
+    let selected;
+    if (RECENCY_WEIGHT) {
+      const { data: visits } = await db.from('visits').select('item_id, visited_on');
+      const lastVisit = {};
+      (visits || []).forEach(v => {
+        if (!lastVisit[v.item_id] || v.visited_on > lastVisit[v.item_id]) lastVisit[v.item_id] = v.visited_on;
+      });
+      const now = new Date();
+      const scored = items.map(r => {
+        const lv = lastVisit[r.id];
+        const days = lv ? Math.floor((now - new Date(lv)) / 86400000) : 365;
+        return { r, score: Math.min(days + 1, 365) };
+      });
+      const count = Math.min(Math.max(Math.ceil(scored.length / 3), 4), scored.length);
+      selected = weightedPick(scored, count);
+    } else {
+      const shuffled = [...items].sort(() => Math.random() - 0.5);
+      selected = shuffled.slice(0, Math.min(Math.max(Math.ceil(items.length / 3), 4), items.length));
+    }
+
+    const { data: ballot, error } = await db.from('ballots').insert({ week_of: nextCycleDate(), closed: false }).select().single();
+    if (error) { flash('Failed to start round: ' + escHtml(error.message), 'err'); return; }
+    await db.from('ballot_options').insert(selected.map(r => ({ ballot_id: ballot.id, item_id: r.id })));
+    flash('New round started!', 'ok');
+    loadRound();
+  }
+
+  function weightedPick(scored, count) {
+    const pool = [...scored];
+    const picked = [];
+    for (let i = 0; i < count; i++) {
+      if (!pool.length) break;
+      const total = pool.reduce((s, x) => s + x.score, 0);
+      let rand = Math.random() * total;
+      for (let j = 0; j < pool.length; j++) {
+        rand -= pool[j].score;
+        if (rand <= 0) { picked.push(pool[j].r); pool.splice(j, 1); break; }
+      }
+    }
+    return picked;
+  }
+
+  function nextCycleDate() {
+    const d = new Date();
+    if (BALLOT_CLOSE_DAY !== null) {
+      const day = d.getDay();
+      const diff = day <= BALLOT_CLOSE_DAY ? BALLOT_CLOSE_DAY - day : 7 - day + BALLOT_CLOSE_DAY;
+      d.setDate(d.getDate() + diff);
+    }
+    return d.toISOString().split('T')[0];
+  }
+
+  // ── NOMINEES (pool) ───────────────────────────────────────────────────────────
+  async function loadNominees() {
+    const el = document.getElementById('nominees-list');
+    el.innerHTML = '<div class="loading">Loading...</div>';
+
+    const { data: items } = await db.from('items').select('*').eq('is_active', true).order('name');
+    const { data: visits } = await db.from('visits').select('item_id, visited_on');
+
+    const lastVisit = {};
+    (visits || []).forEach(v => {
+      if (!lastVisit[v.item_id] || v.visited_on > lastVisit[v.item_id]) lastVisit[v.item_id] = v.visited_on;
+    });
+
+    if (!items || items.length === 0) {
+      el.innerHTML = `<div class="card">No ${ITEM_NOUN_PLURAL} yet. Add one above!</div>`;
+      return;
+    }
+
+    const needsImages = items.filter(r => !r.image_url);
+    if (needsImages.length) prefetchImages(needsImages);
+
+    const genBtn = isKeymaster() && needsImages.length > 0
+      ? `<button class="btn sm" onclick="prefetchImages()">Generate Images (${needsImages.length})</button>` : '';
+
+    el.innerHTML = `<div class="section-hd"><h2>${ITEM_NOUN_CAP} Pool</h2>${genBtn}</div>` +
+      items.map(r => `
+        <div class="card nominee-card">
+          <div>
+            <div class="nominee-name">${escHtml(r.name)}</div>
+            ${r.field2 && FIELD2_LABEL ? `<div class="nominee-sub">${escHtml(r.field2)}</div>` : ''}
+            <div class="nominee-meta">Added by ${escHtml(r.submitted_by || 'someone')}</div>
+            <div class="nominee-meta">${lastVisit[r.id] ? `Last selected: ${fmtDate(lastVisit[r.id])}` : 'Not yet selected'}</div>
+          </div>
+          ${isKeymaster() ? `
+            <div style="display:flex;flex-direction:column;gap:0.4rem;align-items:flex-end">
+              ${lastVisit[r.id]
+                ? `<button class="btn ghost sm" onclick="clearVisits('${r.id}')">Reset</button>`
+                : `<button class="btn ghost sm" onclick="markSelected('${r.id}')">Mark Selected</button>`}
+              <button class="btn danger sm" onclick="removeItem('${r.id}')">Remove</button>
+            </div>` : ''}
+        </div>`
+      ).join('');
+  }
+
+  async function prefetchImages(items) {
+    if (!items) {
+      const { data } = await db.from('items').select('*').eq('is_active', true);
+      items = (data || []).filter(r => !r.image_url && r.image_seed);
+    }
+    items.forEach(r => {
+      if (!r.image_seed) return;
+      const url = itemImageUrl(r);
+      const img = new Image();
+      img.onload = () => db.from('items').update({ image_url: url }).eq('id', r.id);
+      img.src = url;
+    });
+  }
+
+  document.getElementById('add-form').addEventListener('submit', async e => {
+    e.preventDefault();
+    const name   = document.getElementById('new-name').value.trim();
+    const field2 = document.getElementById('new-field2').value.trim();
+    if (!name) return;
+    if (!voterName()) { flash('Enter your name first!', 'err'); return; }
+    const seed = Math.floor(Math.random() * 9999999) + 1;
+    const { data: newItem, error } = await db.from('items').insert({
+      name, field2: field2 || null, submitted_by: voterName(), is_active: true, image_seed: seed
+    }).select().single();
+    if (error) { flash('Failed to add: ' + escHtml(error.message), 'err'); return; }
+    document.getElementById('new-name').value = '';
+    document.getElementById('new-field2').value = '';
+    flash(`${escHtml(name)} added!`, 'ok');
+    const preUrl = itemImageUrl(newItem);
+    const preImg = new Image();
+    preImg.onload = () => db.from('items').update({ image_url: preUrl }).eq('id', newItem.id);
+    preImg.src = preUrl;
+    loadNominees();
+  });
+
+  async function removeItem(id) {
+    if (!isKeymaster()) { flash("You don't have permission to do that.", 'err'); return; }
+    if (!confirm(`Remove this ${ITEM_NOUN} from the pool?`)) return;
+    await db.from('items').update({ is_active: false }).eq('id', id);
+    loadNominees();
+  }
+
+  async function markSelected(id) {
+    await db.from('visits').insert({ item_id: id, visited_on: new Date().toISOString().split('T')[0] });
+    loadNominees();
+  }
+
+  async function clearVisits(id) {
+    if (!confirm('Reset selection history for this item?')) return;
+    await db.from('visits').delete().eq('item_id', id);
+    loadNominees();
+  }
+
+  // ── ARCHIVES (history) ────────────────────────────────────────────────────────
+  async function loadArchives() {
+    const el = document.getElementById('archives-list');
+    el.innerHTML = '<div class="loading">Loading...</div>';
+
+    const { data: ballots } = await db
+      .from('ballots')
+      .select('*, winner:winner_id(name)')
+      .eq('closed', true)
+      .order('week_of', { ascending: false });
+
+    if (!ballots || ballots.length === 0) {
+      el.innerHTML = '<div class="card">No results yet.</div>';
+      return;
+    }
+
+    el.innerHTML = ballots.map(b => `
+      <div class="card result-card">
+        <div>
+          <div style="font-weight:600;font-size:0.95rem">${b.winner ? escHtml(b.winner.name) : 'No winner recorded'}</div>
+          <div class="result-date">${fmtDate(b.week_of)}</div>
+        </div>
+        ${b.winner ? '<span class="champ-badge">Winner</span>' : ''}
+      </div>`
+    ).join('');
+  }
+
+  // ── CONTROL ROOM (admin) ──────────────────────────────────────────────────────
+  let _chaosOn = false;
+
+  async function loadCtrl() {
+    await loadCtrlVotes();
+    await loadChaosState();
+    renderCtrlChaos();
+  }
+
+  async function loadCtrlVotes() {
+    const el = document.getElementById('ctrl-votes');
+    const { data: ballot } = await db.from('ballots').select('id').eq('closed', false)
+      .order('created_at', { ascending: false }).limit(1).single();
+    if (!ballot) { el.innerHTML = '<div class="card">No active round.</div>'; return; }
+
+    const { data: votes } = await db.from('votes')
+      .select('id, voter_name, device_id, items(name)')
+      .eq('ballot_id', ballot.id)
+      .order('voter_name');
+
+    if (!votes || votes.length === 0) { el.innerHTML = '<div class="card">No votes yet.</div>'; return; }
+
+    el.innerHTML = `<table style="width:100%;border-collapse:collapse;margin-bottom:1rem">
+      <thead><tr style="text-align:left;border-bottom:2px solid var(--border)">
+        <th style="padding:8px;font-size:0.8rem;color:var(--muted)">Voter</th>
+        <th style="padding:8px;font-size:0.8rem;color:var(--muted)">Vote</th>
+        <th></th>
+      </tr></thead>
+      <tbody>${votes.map(v => `
+        <tr style="border-bottom:1px solid var(--border)">
+          <td style="padding:8px;font-size:0.875rem">${maskName(v.voter_name)}</td>
+          <td style="padding:8px;font-size:0.875rem">${escHtml(v.items?.name ?? '?')}</td>
+          <td style="padding:8px;text-align:right">
+            <button class="btn ghost sm" onclick="deleteVote('${v.id}')">Remove</button>
+          </td>
+        </tr>`).join('')}
+      </tbody></table>`;
+  }
+
+  async function deleteVote(id) {
+    const { error } = await db.from('votes').delete().eq('id', id);
+    if (error) { flash('Failed: ' + escHtml(error.message), 'err'); return; }
+    flash('Vote removed.', 'ok');
+    loadCtrlVotes();
+  }
+
+  async function loadChaosState() {
+    const { data } = await db.from('settings').select('value').eq('key', 'chaos').single();
+    _chaosOn = data?.value === 'true';
+  }
+
+  function renderCtrlChaos() {
+    const el = document.getElementById('ctrl-chaos');
+    el.innerHTML = `
+      <div style="margin-top:1.5rem;padding-top:1rem;border-top:1px solid var(--border)">
+        <div style="font-weight:600;margin-bottom:6px;font-size:0.9rem">Chaos Mode</div>
+        <button class="btn sm ${_chaosOn ? 'danger' : ''}" onclick="toggleChaos()">
+          ${_chaosOn ? 'Disable Chaos' : 'Enable Chaos'}
+        </button>
+        <span style="font-size:0.75rem;color:var(--muted);margin-left:10px">
+          ${_chaosOn ? 'Users are currently suffering.' : 'Users are fine. (Boring.)'}
+        </span>
+      </div>`;
+  }
+
+  async function toggleChaos() {
+    _chaosOn = !_chaosOn;
+    await db.from('settings').upsert({ key: 'chaos', value: String(_chaosOn) });
+    flash(_chaosOn ? 'Chaos unleashed.' : 'Chaos contained.', 'ok');
+    if (_chaosOn && typeof startChaos === 'function') startChaos({ appName: APP_NAME, itemNoun: ITEM_NOUN });
+    if (!_chaosOn && typeof stopChaos === 'function') stopChaos();
+    renderCtrlChaos();
+  }
+
+  // ── CHAOS LOADER ─────────────────────────────────────────────────────────────
+  async function initChaos() {
+    const { data } = await db.from('settings').select('value').eq('key', 'chaos').single();
+    _chaosOn = data?.value === 'true';
+    if (_chaosOn && !isKeymaster() && typeof startChaos === 'function') {
+      startChaos({ appName: APP_NAME, itemNoun: ITEM_NOUN });
+    }
+  }
+
+  // ── UTILS ─────────────────────────────────────────────────────────────────────
+  function fmtDate(d) {
+    return new Date(d + 'T12:00:00').toLocaleDateString('en-US', {
+      weekday: 'short', month: 'short', day: 'numeric', year: 'numeric'
+    });
+  }
+
+  function escHtml(str) {
+    return String(str)
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  // Chaos face image — set per site at generation time
+  window.CHAOS_FACE_URL = '__FACE_IMAGE_URL__';
+
+  // ── BOOT ─────────────────────────────────────────────────────────────────────
+  document.getElementById('ctrl-tab-btn').style.display = isKeymaster() ? '' : 'none';
+  initChaos();
+  loadRound();
+</script>
+
+<!-- Chaos module — hosted centrally, updated in one place -->
+<script src="__CHAOS_JS_URL__"></script>
+
+</body>
+</html>
