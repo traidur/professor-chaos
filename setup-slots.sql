@@ -177,7 +177,22 @@ insert into public.slot_registry (slot_name) values
   ('slot16'),('slot17'),('slot18'),('slot19'),('slot20');
 
 -- ── DONE ──────────────────────────────────────────────────────────────────────
+-- ── GRANT SCHEMA PERMISSIONS ─────────────────────────────────────────────────
+
+do $$
+declare
+  i int;
+  s text;
+begin
+  for i in 1..20 loop
+    s := 'slot' || lpad(i::text, 2, '0');
+    execute format('grant usage on schema %I to anon, authenticated', s);
+    execute format('grant all on all tables in schema %I to anon, authenticated', s);
+  end loop;
+end;
+$$;
+
 -- After running this file:
--- 1. Go to Supabase dashboard → API settings → Extra allowed schemas
+-- 1. Go to Supabase dashboard → Data API → Settings → Exposed schemas
 -- 2. Add: slot01, slot02, ... slot20  (all 20)
 -- 3. Save. Now the JS client can use db.schema('slot01').from('items') etc.
