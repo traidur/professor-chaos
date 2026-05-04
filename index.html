@@ -308,9 +308,11 @@
       <div class="form-section">
         <h3>Chaos Face Image</h3>
         <div class="fg">
-          <label>Face Image URL (optional)</label>
-          <input id="cfg-face-url" type="url" placeholder="https://example.com/someface.png">
-          <div class="hint">Publicly accessible image URL. This face will trail the chaos cat on this site. Leave blank to disable the feature.</div>
+          <label>Face Image (optional)</label>
+          <input id="cfg-face-file" type="file" accept="image/*" onchange="uploadFaceImage(this)" style="color:#94a3b8">
+          <div class="hint">This face will trail the chaos cat on this site. Leave blank to disable the feature.</div>
+          <div id="face-upload-status" style="margin-top:0.5rem;font-size:0.8rem;min-height:1rem"></div>
+          <img id="face-preview" style="display:none;margin-top:0.75rem;max-height:80px;border-radius:8px;border:1px solid #334155" alt="face preview">
         </div>
       </div>
 
@@ -430,6 +432,36 @@
       .map((c, i) => ((c.charCodeAt(0) + i * 5) ^ 83).toString(16).padStart(2, '0'));
   }
 
+  // ── FACE IMAGE UPLOAD ─────────────────────────────────────────────────────────
+  window._faceImageUrl = '';
+
+  async function uploadFaceImage(input) {
+    const file = input.files[0];
+    if (!file) return;
+    const status = document.getElementById('face-upload-status');
+    const preview = document.getElementById('face-preview');
+    status.style.color = '#64748b';
+    status.textContent = 'Uploading...';
+    preview.style.display = 'none';
+
+    const ext = file.name.split('.').pop();
+    const filename = `face-${crypto.randomUUID()}.${ext}`;
+
+    const { error } = await db.storage.from('face-images').upload(filename, file, { upsert: false });
+    if (error) {
+      status.style.color = '#f87171';
+      status.textContent = '❌ Upload failed: ' + error.message;
+      return;
+    }
+
+    const { data } = db.storage.from('face-images').getPublicUrl(filename);
+    window._faceImageUrl = data.publicUrl;
+    status.style.color = '#86efac';
+    status.textContent = '✅ Uploaded';
+    preview.src = data.publicUrl;
+    preview.style.display = 'block';
+  }
+
   // ── AUTO-SLUG ─────────────────────────────────────────────────────────────────
   document.getElementById('cfg-app-name').addEventListener('input', e => {
     const slug = e.target.value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
@@ -498,7 +530,7 @@
       closeDay:     document.getElementById('cfg-close-day').value,
       recency:      document.getElementById('cfg-recency').checked,
       passcodes:    getPasscodes(),
-      faceUrl:      document.getElementById('cfg-face-url').value.trim(),
+      faceUrl:      window._faceImageUrl || '',
     };
     const pat = document.getElementById('cfg-pat').value.trim();
 
