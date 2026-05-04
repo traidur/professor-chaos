@@ -10,8 +10,26 @@
  */
 
 // URL of the professor-chaos GitHub Pages site (no trailing slash)
-// e.g. 'https://yourusername.github.io/professor-chaos'
 const PROFESSOR_CHAOS_ORIGIN = 'https://traidur.github.io/professor-chaos';
+
+// Platform Supabase — for reading chaos config
+const _PC_URL = 'https://gsitwuzhtyzdgoihmruz.supabase.co';
+const _PC_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdzaXR3dXpodHl6ZGdvaWhtcnV6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc2NjAyMDAsImV4cCI6MjA5MzIzNjIwMH0.wfLeKzqQGbpivMFswqb0W88KIPG0p7CGuCRfBwfRWZ4';
+
+async function _loadChaosConfig() {
+  try {
+    const resp = await fetch(
+      `${_PC_URL}/rest/v1/platform_settings?key=eq.chaos_config&select=value`,
+      { headers: { 'apikey': _PC_KEY, 'Authorization': `Bearer ${_PC_KEY}` } }
+    );
+    const data = await resp.json();
+    if (data && data[0] && data[0].value) {
+      // DB config takes precedence; CHAOS_CONFIG fills in any missing keys
+      return { ...CHAOS_CONFIG, ...data[0].value };
+    }
+  } catch(e) { /* fall through to defaults */ }
+  return CHAOS_CONFIG;
+}
 
 const CHAOS_CONFIG = {
   premStrip:        true,   // "Upgrade to Pro" banner strip
@@ -48,34 +66,36 @@ let _cdtInt = null;
 let _gutterClockInt = null;
 
 // ── ENTRY POINTS ─────────────────────────────────────────────────────────────
-window.startChaos = function(cfg = {}) {
+window.startChaos = async function(cfg = {}) {
   _cfg = cfg;
   if (_started) return;
   _started = true;
 
-  if (CHAOS_CONFIG.bannerAd)       _genBannerAd();
-  if (CHAOS_CONFIG.premStrip)      _premStrip();
-  if (CHAOS_CONFIG.geoChaos)       _geoChaos();
-  if (CHAOS_CONFIG.cat)            _spawnCat();
-  if (CHAOS_CONFIG.face)           _spawnFace();
-  if (CHAOS_CONFIG.truck)          _scheduleTruck();
-  if (CHAOS_CONFIG.fontChaos)      _startFontChaos();
-  if (CHAOS_CONFIG.infiniteScroll) _startInfScroll();
-  if (CHAOS_CONFIG.subwaySurfers)  _startSubwaySurfers();
-  if (CHAOS_CONFIG.reportButton)   _startReportBtn();
-  if (CHAOS_CONFIG.exitIntent)     _exitIntent();
-  if (CHAOS_CONFIG.titleFlicker)   _startTitleFlicker();
-  if (CHAOS_CONFIG.rageClick)      _startRageClick();
-  if (CHAOS_CONFIG.progressBar)    _startProgressBar();
-  if (CHAOS_CONFIG.faviconBadge)   _fakeFaviconBadge();
-  if (CHAOS_CONFIG.clickBlip)      document.addEventListener('mousedown', _clickBlip);
+  const C = await _loadChaosConfig();
 
-  setTimeout(() => { if (CHAOS_CONFIG.cookieBanner) _cookieBanner(); }, 1200);
-  setTimeout(() => { if (CHAOS_CONFIG.fakeNotif)    _fakeNotifPrompt(); }, 10000);
-  setTimeout(() => { if (CHAOS_CONFIG.millionthUser) _millVoter(); }, 6000);
-  setTimeout(() => { if (CHAOS_CONFIG.survey)        _survey(); }, 55000);
+  if (C.bannerAd)       _genBannerAd();
+  if (C.premStrip)      _premStrip();
+  if (C.geoChaos)       _geoChaos();
+  if (C.cat)            _spawnCat();
+  if (C.face)           _spawnFace();
+  if (C.truck)          _scheduleTruck();
+  if (C.fontChaos)      _startFontChaos();
+  if (C.infiniteScroll) _startInfScroll();
+  if (C.subwaySurfers)  _startSubwaySurfers();
+  if (C.reportButton)   _startReportBtn();
+  if (C.exitIntent)     _exitIntent();
+  if (C.titleFlicker)   _startTitleFlicker();
+  if (C.rageClick)      _startRageClick();
+  if (C.progressBar)    _startProgressBar();
+  if (C.faviconBadge)   _fakeFaviconBadge();
+  if (C.clickBlip)      document.addEventListener('mousedown', _clickBlip);
 
-  if (CHAOS_CONFIG.fakeActivity) _fakeActivityLoop();
+  setTimeout(() => { if (C.cookieBanner)   _cookieBanner(); }, 1200);
+  setTimeout(() => { if (C.fakeNotif)      _fakeNotifPrompt(); }, 10000);
+  setTimeout(() => { if (C.millionthUser)  _millVoter(); }, 6000);
+  setTimeout(() => { if (C.survey)         _survey(); }, 55000);
+
+  if (C.fakeActivity) _fakeActivityLoop();
 };
 
 window.stopChaos = function() {

@@ -163,7 +163,11 @@
     .loading { color: #64748b; padding: 2rem; text-align: center; font-size: 0.875rem; }
 
     /* CHAOS CONFIG */
-    .chaos-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.25rem 1.5rem; }
+    .chaos-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 1.5rem; }
+    .chaos-row { display: flex; align-items: center; justify-content: space-between; padding: 0.5rem 0; border-bottom: 1px solid #1e293b; }
+    .chaos-row:last-child { border-bottom: none; }
+    .chaos-row-label { font-size: 0.84rem; color: #cbd5e1; }
+    .chaos-row-key { font-size: 0.68rem; color: #475569; font-family: monospace; }
     @media (max-width: 600px) { .chaos-grid { grid-template-columns: 1fr; } .fg-row, .fg-3 { grid-template-columns: 1fr; } }
   </style>
 </head>
@@ -336,20 +340,18 @@
       <div class="form-section">
         <h3>Chaos Elements</h3>
         <p style="font-size:0.8rem;color:#64748b;margin-bottom:1.25rem">
-          Changes here require editing <code>CHAOS_CONFIG</code> at the top of <code>chaos.js</code> and pushing to GitHub.
-          All generated sites automatically pick up the change.
+          Toggles save to Supabase instantly. <code>chaos.js</code> reads this config on every page load —
+          all generated sites pick up changes automatically. New elements added to <code>chaos.js</code>
+          appear here automatically and default to enabled.
         </p>
-        <div class="chaos-grid" id="chaos-grid"></div>
-        <div style="margin-top:1.25rem" class="alert info">
-          ℹ️ Open <code>chaos.js</code> in your editor and set any element to <code>false</code> to disable it globally.
-          Push to GitHub Pages — done.
-        </div>
+        <div id="chaos-grid" class="chaos-grid"></div>
+        <div id="chaos-save-status" style="margin-top:1rem;font-size:0.8rem;color:#64748b;min-height:1.2rem"></div>
       </div>
       <div class="form-section">
         <h3>Add New Chaos Element</h3>
         <p style="font-size:0.8rem;color:#64748b;margin-bottom:1rem">
-          Write a new function in <code>chaos.js</code>, add it to <code>CHAOS_CONFIG</code>, then call it inside <code>startChaos()</code>.
-          Every generated site gets it on next page load. No deploys needed on generated sites.
+          Write a new function in <code>chaos.js</code>, add it to <code>CHAOS_CONFIG</code>, call it inside <code>startChaos()</code>, then push.
+          It will appear as a toggle here automatically on next load.
         </p>
         <div class="alert warn">
           🔥 This is your superpower. Update one file, chaos everywhere.
@@ -399,7 +401,8 @@
     const tab = btn.dataset.tab;
     document.getElementById(`tab-${tab}`).classList.add('active');
     btn.classList.add('active');
-    if (tab === 'registry') loadRegistry();
+    if (tab === 'registry')   loadRegistry();
+    if (tab === 'chaos-cfg') loadChaosConfig();
   }
 
   // ── PASSCODE MANAGEMENT ──────────────────────────────────────────────────────
@@ -704,7 +707,7 @@
     document.getElementById('slot-counter').textContent = `${used} / ${data.length} slots used`;
   }
 
-  // ── CHAOS CONFIG GRID ─────────────────────────────────────────────────────────
+  // ── CHAOS CONFIG ──────────────────────────────────────────────────────────────
   const CHAOS_LABELS = {
     premStrip:       'Premium upsell strip',
     bannerAd:        'Rotating SaaS banner ad',
@@ -731,13 +734,71 @@
     reportButton:    '"Report a Problem" runner',
   };
 
+  let _chaosConfig = {};
+
+  async function loadChaosConfig() {
+    const el = document.getElementById('chaos-grid');
+    el.innerHTML = '<div style="color:#64748b;padding:1rem 0;font-size:0.85rem">Loading...</div>';
+
+    const { data, error } = await db.from('platform_settings').select('value').eq('key', 'chaos_config').single();
+
+    if (error && error.code !== 'PGRST116') {
+      el.innerHTML = `<div class="alert err">${escHtml(error.message)}</div>`;
+      return;
+    }
+
+    // Merge DB config with CHAOS_LABELS defaults (new keys default to true)
+    const saved = data?.value || {};
+    _chaosConfig = {};
+    for (const key of Object.keys(CHAOS_LABELS)) {
+      _chaosConfig[key] = key in saved ? saved[key] : true;
+    }
+
+    renderChaosGrid();
+  }
+
   function renderChaosGrid() {
     const el = document.getElementById('chaos-grid');
-    el.innerHTML = Object.entries(CHAOS_LABELS).map(([key, label]) => `
-      <div class="toggle-row">
-        <label style="font-size:0.82rem">${label}</label>
-        <span style="font-size:0.7rem;color:#475569;font-family:monospace">${key}</span>
+    const entries = Object.entries(CHAOS_LABELS);
+    const half = Math.ceil(entries.length / 2);
+    const cols = [entries.slice(0, half), entries.slice(half)];
+
+    el.innerHTML = cols.map(col => `
+      <div>
+        ${col.map(([key, label]) => `
+          <div class="chaos-row">
+            <div>
+              <div class="chaos-row-label">${label}</div>
+              <div class="chaos-row-key">${key}</div>
+            </div>
+            <label class="toggle" style="flex-shrink:0;margin-left:1rem">
+              <input type="checkbox" ${_chaosConfig[key] ? 'checked' : ''} onchange="toggleChaosElement('${key}', this.checked)">
+              <span class="toggle-slider"></span>
+            </label>
+          </div>`).join('')}
       </div>`).join('');
+  }
+
+  let _chaosDebounce = null;
+
+  async function toggleChaosElement(key, enabled) {
+    _chaosConfig[key] = enabled;
+    const status = document.getElementById('chaos-save-status');
+    status.textContent = 'Saving...';
+    status.style.color = '#64748b';
+
+    clearTimeout(_chaosDebounce);
+    _chaosDebounce = setTimeout(async () => {
+      const { error } = await db.from('platform_settings').upsert({ key: 'chaos_config', value: _chaosConfig });
+      if (error) {
+        status.textContent = '❌ Save failed: ' + error.message;
+        status.style.color = '#f87171';
+      } else {
+        status.textContent = '✅ Saved — all sites pick this up on next load.';
+        status.style.color = '#86efac';
+        setTimeout(() => { status.textContent = ''; }, 3000);
+      }
+    }, 400);
   }
 
   // ── UTILS ─────────────────────────────────────────────────────────────────────
