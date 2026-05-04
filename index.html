@@ -872,7 +872,10 @@
                 <td>${s.app_name ? escHtml(s.app_name) : `<span class="avail-dot green"></span>Available`}</td>
                 <td class="slot-url">${s.live_url ? `<a href="${escHtml(s.live_url)}" target="_blank">${escHtml(s.live_url)}</a>` : '—'}</td>
                 <td style="font-size:0.75rem;color:#64748b">${s.claimed_at ? new Date(s.claimed_at).toLocaleDateString() : '—'}</td>
-                <td>${!s.is_available ? `<button class="btn danger sm" onclick="releaseSlot('${escHtml(s.slot_name)}')">Release</button>` : ''}</td>
+                <td style="display:flex;gap:0.4rem">
+                  ${!s.is_available ? `<button class="btn secondary sm" onclick="openRestyle('${escHtml(s.slot_name)}')">Restyle</button>` : ''}
+                  ${!s.is_available ? `<button class="btn danger sm" onclick="releaseSlot('${escHtml(s.slot_name)}')">Release</button>` : ''}
+                </td>
               </tr>`).join('')}
           </tbody>
         </table>
@@ -1005,8 +1008,126 @@
     return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   }
 
+  // ── RESTYLE ───────────────────────────────────────────────────────────────────
+  let _restyleSlot = null;
+
+  function openRestyle(slotName) {
+    _restyleSlot = slotName;
+    const modal = document.getElementById('restyle-modal');
+    // Pre-fill from stored config if available
+    const row = document.querySelector(`[data-slot="${slotName}"]`);
+    document.getElementById('restyle-style').value = 'navy';
+    document.getElementById('restyle-color').value = '#f0a500';
+    document.getElementById('restyle-status').textContent = '';
+    document.getElementById('restyle-title').textContent = `Restyle — ${slotName}`;
+    updateRestylePreview();
+    modal.style.display = 'flex';
+  }
+
+  function updateRestylePreview() {
+    const style = document.getElementById('restyle-style').value;
+    const color = document.getElementById('restyle-color').value;
+    const dark  = darkenHex(color);
+    const prev  = document.getElementById('restyle-preview');
+    const headerColors = { navy: '#1a2035', bold: color, clean: '#ffffff', terminal: '#161b22' };
+    const bgColors     = { navy: '#f4f6f9', bold: '#f4f6f9', clean: '#ffffff', terminal: '#0d1117' };
+    prev.style.background = bgColors[style];
+    prev.innerHTML = `
+      <div style="background:${headerColors[style]};height:22px;border-bottom:3px solid ${style==='bold'?'transparent':color};display:flex;align-items:center;padding:0 10px">
+        <div style="width:50px;height:7px;border-radius:2px;background:${style==='bold'?'rgba(255,255,255,0.9)':color}"></div>
+      </div>
+      <div style="padding:6px 10px;display:flex;gap:5px">
+        <div style="height:18px;border-radius:${style==='terminal'||style==='bold'?'2px':'10px'};background:${style==='terminal'?'transparent':color};border:${style==='terminal'?`1px solid ${color}`:'none'};padding:0 8px;font-size:8px;color:${style==='terminal'?color:'white'};display:flex;align-items:center;font-family:${style==='terminal'?'monospace':'sans-serif'}">Button</div>
+        <div style="flex:1;height:18px;border-radius:${style==='terminal'||style==='bold'?'2px':'6px'};background:${style==='terminal'?'#161b22':style==='clean'?'#f4f6f9':'white'};border:1px solid ${style==='terminal'?'#30363d':'#e1e5eb'}"></div>
+      </div>`;
+  }
+
+  async function applyRestyle() {
+    const slotName = _restyleSlot;
+    const style = document.getElementById('restyle-style').value;
+    const color = document.getElementById('restyle-color').value;
+    const dark  = darkenHex(color);
+    const pat   = sessionStorage.getItem('pc_pat');
+    const status = document.getElementById('restyle-status');
+
+    if (!pat) { status.style.color='#f87171'; status.textContent='❌ No GitHub PAT in session — paste it on the Generate tab first.'; return; }
+
+    status.style.color = '#64748b'; status.textContent = 'Loading slot config...';
+
+    // Get stored config
+    const { data: regData, error: regErr } = await db.from('slot_registry').select('config, github_repo').eq('slot_name', slotName).single();
+    if (regErr || !regData?.config) { status.style.color='#f87171'; status.textContent='❌ Could not load slot config.'; return; }
+
+    const config = { ...regData.config, style, color, colorDark: dark };
+
+    // Extract owner/repo from github_repo URL
+    const match = regData.github_repo.match(/github\.com\/([^/]+)\/([^/]+)/);
+    if (!match) { status.style.color='#f87171'; status.textContent='❌ Could not parse GitHub repo URL.'; return; }
+    const [, owner, repo] = match;
+
+    status.textContent = 'Building HTML...';
+    let html;
+    try { html = await buildSiteHtml(config, slotName); }
+    catch(e) { status.style.color='#f87171'; status.textContent='❌ ' + e.message; return; }
+
+    status.textContent = 'Getting file SHA from GitHub...';
+    const shaResp = await ghFetch(`https://api.github.com/repos/${owner}/${repo}/contents/index.html`, pat);
+    if (!shaResp.ok) { status.style.color='#f87171'; status.textContent='❌ Could not get file SHA — check PAT has repo scope.'; return; }
+    const shaData = await shaResp.json();
+
+    status.textContent = 'Pushing update...';
+    const content = btoa(unescape(encodeURIComponent(html)));
+    const pushResp = await ghFetch(`https://api.github.com/repos/${owner}/${repo}/contents/index.html`, pat, {
+      method: 'PUT',
+      body: JSON.stringify({ message: `Restyle: ${style}`, content, sha: shaData.sha })
+    });
+
+    if (!pushResp.ok) {
+      const err = await pushResp.json();
+      status.style.color='#f87171'; status.textContent='❌ Push failed: ' + (err.message || pushResp.status);
+      return;
+    }
+
+    // Save new style to config in registry
+    await db.from('slot_registry').update({ config }).eq('slot_name', slotName);
+
+    status.style.color='#86efac';
+    status.textContent='✅ Done! GitHub Pages will update in ~60 seconds.';
+  }
+
   // Focus passphrase on load
   document.getElementById('passphrase-input').focus();
 </script>
+<!-- RESTYLE MODAL -->
+<div id="restyle-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:1000;align-items:center;justify-content:center;padding:1rem">
+  <div style="background:#1e293b;border:1px solid #334155;border-radius:12px;padding:1.5rem;max-width:480px;width:100%">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem">
+      <h3 id="restyle-title" style="font-size:1rem;font-weight:700;color:#7c3aed"></h3>
+      <button onclick="document.getElementById('restyle-modal').style.display='none'" style="background:none;border:none;color:#64748b;cursor:pointer;font-size:1.2rem">✕</button>
+    </div>
+    <div class="fg-row" style="margin-bottom:0.75rem">
+      <div class="fg">
+        <label>Style Preset</label>
+        <select id="restyle-style" onchange="updateRestylePreview()">
+          <option value="navy">Navy</option>
+          <option value="bold">Bold</option>
+          <option value="clean">Clean</option>
+          <option value="terminal">Terminal</option>
+        </select>
+      </div>
+      <div class="fg">
+        <label>Accent Color</label>
+        <input id="restyle-color" type="color" value="#f0a500" oninput="updateRestylePreview()">
+      </div>
+    </div>
+    <div id="restyle-preview" style="border-radius:6px;overflow:hidden;border:1px solid #334155;height:52px;margin-bottom:1rem"></div>
+    <div id="restyle-status" style="font-size:0.8rem;min-height:1.2rem;margin-bottom:1rem"></div>
+    <div style="display:flex;gap:0.75rem;justify-content:flex-end">
+      <button class="btn secondary" onclick="document.getElementById('restyle-modal').style.display='none'">Cancel</button>
+      <button class="btn" onclick="applyRestyle()">Apply Restyle</button>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>
