@@ -229,15 +229,14 @@
 
       <div class="form-section">
         <h3>What Are You Voting On?</h3>
-        <div class="fg-row">
-          <div class="fg">
-            <label>Item Noun (singular)</label>
-            <input id="cfg-noun" type="text" placeholder="restaurant" maxlength="40">
-          </div>
-          <div class="fg">
-            <label>Item Noun (plural)</label>
-            <input id="cfg-noun-plural" type="text" placeholder="restaurants" maxlength="40">
-          </div>
+        <div class="fg">
+          <label>Item Noun (singular)</label>
+          <input id="cfg-noun" type="text" placeholder="restaurant" maxlength="40">
+          <div class="hint">Plural will be auto-generated. Override below if needed.</div>
+        </div>
+        <div class="fg" id="noun-plural-group" style="display:none">
+          <label>Item Noun (plural) <span style="color:#475569;font-weight:400">— override</span></label>
+          <input id="cfg-noun-plural" type="text" maxlength="40">
         </div>
         <div class="fg-row">
           <div class="fg">
@@ -433,6 +432,21 @@
     document.getElementById('cfg-repo-name').value = slug;
   });
 
+  // ── AUTO-PLURAL ───────────────────────────────────────────────────────────────
+  function pluralize(word) {
+    if (!word) return '';
+    const w = word.toLowerCase();
+    if (w.endsWith('s') || w.endsWith('x') || w.endsWith('z') || w.endsWith('ch') || w.endsWith('sh')) return w + 'es';
+    if (w.endsWith('y') && !['a','e','i','o','u'].includes(w.slice(-2,-1))) return w.slice(0,-1) + 'ies';
+    return w + 's';
+  }
+
+  document.getElementById('cfg-noun').addEventListener('input', e => {
+    const plural = pluralize(e.target.value.trim());
+    document.getElementById('cfg-noun-plural').value = plural;
+    document.getElementById('noun-plural-group').style.display = plural ? '' : 'none';
+  });
+
   // ── COLOR DARKENER ────────────────────────────────────────────────────────────
   function darkenHex(hex, factor = 0.82) {
     const r = Math.round(parseInt(hex.slice(1,3), 16) * factor);
@@ -471,7 +485,7 @@
       appName:      document.getElementById('cfg-app-name').value.trim(),
       repoName:     document.getElementById('cfg-repo-name').value.trim(),
       itemNoun:     document.getElementById('cfg-noun').value.trim(),
-      itemNounPlural: document.getElementById('cfg-noun-plural').value.trim(),
+      itemNounPlural: document.getElementById('cfg-noun-plural').value.trim() || pluralize(document.getElementById('cfg-noun').value.trim()),
       field1Label:  document.getElementById('cfg-field1').value.trim(),
       field2Label:  document.getElementById('cfg-field2').value.trim(),
       color:        document.getElementById('cfg-color').value,
