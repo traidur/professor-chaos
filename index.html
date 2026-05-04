@@ -318,8 +318,8 @@
         <h3>GitHub Deployment</h3>
         <div class="fg">
           <label>GitHub Personal Access Token</label>
-          <input id="cfg-pat" type="password" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx">
-          <div class="hint">Needs <code>repo</code> scope. <a href="https://github.com/settings/tokens/new?scopes=repo&description=professor-chaos" target="_blank" style="color:#7c3aed">Generate one here ↗</a></div>
+          <input id="cfg-pat" type="password" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" oninput="sessionStorage.setItem('pc_pat', this.value)">
+          <div class="hint">Needs <code>repo</code> scope. Saved for this session only — clears when you close the tab. <a href="https://github.com/settings/tokens/new?scopes=repo&description=professor-chaos" target="_blank" style="color:#7c3aed">Generate one here ↗</a></div>
         </div>
       </div>
 
@@ -387,6 +387,8 @@
     if (input === _pd(_pp)) {
       document.getElementById('lock-screen').style.display = 'none';
       document.getElementById('main-ui').style.display = 'block';
+      const savedPat = sessionStorage.getItem('pc_pat');
+      if (savedPat) document.getElementById('cfg-pat').value = savedPat;
       loadRegistry();
       renderChaosGrid();
     } else {
