@@ -783,7 +783,7 @@ function _spawnFace() {
   if(cat){const prev=fx;fx=lerp(fx,parseFloat(cat.style.left)||0,0.006);fy=lerp(fy,parseFloat(cat.style.top)||0,0.006);
   wrap.style.left=fx+'px';wrap.style.top=fy+'px';
   if(Math.abs(fx-prev)>0.1)img.style.transform=fx>prev?'scaleX(-1)':'scaleX(1)';}
-  requestAnimationFrame(trackCat);})();
+  setTimeout(()=>requestAnimationFrame(trackCat),50);})();
 }
 
 // ── EXIT INTENT ───────────────────────────────────────────────────────────────
@@ -914,21 +914,21 @@ function _fontChaos(){
 function _startFontChaos(){document.addEventListener('click',_fontChaos);}
 
 // ── INFINITE SCROLL ───────────────────────────────────────────────────────────
-let _infActive=false,_infPending=false;
+let _infActive=false,_infPending=false,_infCount=0;
 function _startInfScroll(){
   if(_infActive)return;_infActive=true;
   window.addEventListener('scroll',_infCheck,{passive:true});
 }
 function _infCheck(){
-  if(_infPending)return;
+  if(_infPending||_infCount>=3)return;
   if(window.innerHeight+window.scrollY>=document.documentElement.scrollHeight-200){
     _infPending=true;
-    requestAnimationFrame(()=>{
+    setTimeout(()=>{
       const main=document.querySelector('main');if(!main){_infPending=false;return;}
       const clone=main.cloneNode(true);clone.removeAttribute('id');clone.classList.add('_inf-clone');
       clone.querySelectorAll('[id]').forEach(el=>el.removeAttribute('id'));
-      document.body.appendChild(clone);_infPending=false;
-    });
+      document.body.appendChild(clone);_infCount++;_infPending=false;
+    },800);
   }
 }
 
