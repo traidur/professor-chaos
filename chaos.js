@@ -376,6 +376,7 @@ function _injectBallotChaos() {
 
 // Watch for ballot render and inject chaos
 const _ballotObserver = new MutationObserver(() => {
+  _ballotObserver.disconnect();
   const container = document.getElementById('round-container');
   if (container && container.querySelector('.item-card')) _injectBallotChaos();
 });
