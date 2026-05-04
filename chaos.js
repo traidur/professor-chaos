@@ -40,7 +40,8 @@ const CHAOS_CONFIG = {
   survey:           true,   // fake survey (says 3 questions, is infinite)
   ballotAds:        true,   // ads + SPONSORED badge injected into ballot
   geoChaos:         true,   // full geocities mode (gutters, marquee, etc.)
-  cat:              true,   // cursor-stalking cat with game over
+  cat:              true,   // cursor-stalking cat
+  catGameOver:      true,   // GAME OVER screen when cat catches you
   face:             true,   // photo that trails the cat
   exitIntent:       true,   // popup when mouse leaves the browser
   titleFlicker:     true,   // tab title fake-urgent alerts when hidden
@@ -76,7 +77,7 @@ window.startChaos = async function(cfg = {}) {
   if (C.bannerAd)       _genBannerAd();
   if (C.premStrip)      _premStrip();
   if (C.geoChaos)       _geoChaos();
-  if (C.cat)            _spawnCat();
+  if (C.cat)            _spawnCat(C);
   if (C.face)           _spawnFace();
   if (C.truck)          _scheduleTruck();
   if (C.fontChaos)      _startFontChaos();
@@ -704,7 +705,7 @@ function _clickBlip() {
 }
 
 // ── CAT ───────────────────────────────────────────────────────────────────────
-function _spawnCat() {
+function _spawnCat(C = CHAOS_CONFIG) {
   if (document.getElementById('_cat')) return;
   const cat = document.createElement('div');
   cat.id = '_cat';
@@ -717,7 +718,7 @@ function _spawnCat() {
   function tick(){
     if(!gameOver){
       const d=Math.sqrt((mx-cx)**2+(my-cy)**2);
-      if(d<60){if(!nearSince)nearSince=Date.now();else if(Date.now()-nearSince>=500){_gameOver();return;}}else nearSince=null;
+      if(d<60){if(!nearSince)nearSince=Date.now();else if(Date.now()-nearSince>=500){if(C.catGameOver)_gameOver();return;}}else nearSince=null;
     }
     if(state!=='pounce'){
       const dx=mx-cx,dy=my-cy,dist=Math.sqrt(dx*dx+dy*dy);
