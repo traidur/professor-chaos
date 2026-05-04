@@ -209,6 +209,26 @@
     <div id="tab-generate" class="tab-pane active">
 
       <div class="form-section">
+        <h3>Visual Style</h3>
+        <div class="fg-row">
+          <div class="fg">
+            <label>Style Preset</label>
+            <select id="cfg-style" onchange="updateStylePreview()">
+              <option value="navy">Navy — dark header, accent details</option>
+              <option value="bold">Bold — colored header, sharp edges</option>
+              <option value="clean">Clean — white header, minimal borders</option>
+              <option value="terminal">Terminal — full dark, monospace</option>
+            </select>
+          </div>
+          <div class="fg">
+            <label>Accent Color</label>
+            <input id="cfg-color" type="color" value="#f0a500" oninput="updateStylePreview()">
+          </div>
+        </div>
+        <div id="style-preview" style="margin-top:0.75rem;border-radius:8px;overflow:hidden;border:1px solid #334155;height:60px;transition:all 0.2s"></div>
+      </div>
+
+      <div class="form-section">
         <h3>Site Identity</h3>
         <div class="fg-row">
           <div class="fg">
@@ -220,10 +240,6 @@
             <input id="cfg-repo-name" type="text" placeholder="friday-lunch-vote" maxlength="60">
             <div class="hint">Auto-generated from site name. Letters, numbers, hyphens only.</div>
           </div>
-        </div>
-        <div class="fg">
-          <label>Primary Color</label>
-          <input id="cfg-color" type="color" value="#7c3aed">
         </div>
       </div>
 
@@ -432,6 +448,126 @@
       .map((c, i) => ((c.charCodeAt(0) + i * 5) ^ 83).toString(16).padStart(2, '0'));
   }
 
+  // ── STYLE PRESETS ─────────────────────────────────────────────────────────────
+  const STYLE_PRESETS = {
+    navy: (color, dark) => `
+      .app-header { background: #1a2035; border-bottom: 3px solid ${color}; }
+      .app-header h1 { color: ${color}; }
+      nav button.active { color: ${color}; border-bottom-color: ${color}; }
+      .btn { background: ${color}; } .btn:hover { background: ${dark}; }
+      .tally-bar-fill { background: ${color}; }
+      .item-card.my-pick { border-color: ${color}; }
+      .item-card:hover:not(.locked) { border-color: ${color}; }
+      .field-group input:focus { border-color: ${color}; }
+    `,
+    bold: (color, dark) => `
+      .app-header { background: ${color}; border-bottom: none; }
+      .app-header h1 { color: white; }
+      .identity-wrap { color: rgba(255,255,255,0.85); }
+      .identity-wrap input { background: rgba(0,0,0,0.2); border-color: rgba(255,255,255,0.25); color: white; }
+      .identity-wrap input::placeholder { color: rgba(255,255,255,0.4); }
+      nav { background: ${dark}; border-bottom: none; }
+      nav button { color: rgba(255,255,255,0.6); }
+      nav button:hover { color: white; background: rgba(255,255,255,0.1); }
+      nav button.active { color: white; border-bottom-color: white; }
+      .card { border-radius: 4px; }
+      .btn { background: ${color}; border-radius: 4px; } .btn:hover { background: ${dark}; }
+      .btn.ghost { border-radius: 4px; }
+      .tally-bar-fill { background: ${color}; }
+      .item-card.my-pick { border-color: ${color}; }
+      .item-card:hover:not(.locked) { border-color: ${color}; }
+    `,
+    clean: (color, dark) => `
+      body, html { background: #ffffff; }
+      .app-header { background: white; border-bottom: 2px solid ${color}; }
+      .app-header h1 { color: ${color}; }
+      .identity-wrap { color: #6b7280; }
+      .identity-wrap input { background: #f4f6f9; border-color: #e1e5eb; color: #1c2130; }
+      .identity-wrap input::placeholder { color: #9ca3af; }
+      nav { background: white; box-shadow: none; border-bottom: 1px solid #e1e5eb; }
+      nav button.active { color: ${color}; border-bottom-color: ${color}; }
+      .card { box-shadow: none; border: 1.5px solid #e1e5eb; }
+      .add-form { box-shadow: none; }
+      main { background: white; }
+      .btn { background: ${color}; } .btn:hover { background: ${dark}; }
+      .tally-bar-fill { background: ${color}; }
+      .item-card.my-pick { border-color: ${color}; }
+      .item-card:hover:not(.locked) { border-color: ${color}; box-shadow: none; }
+      .field-group input { background: white; }
+      .field-group input:focus { border-color: ${color}; }
+    `,
+    terminal: (color, dark) => `
+      body, html { background: #0d1117; color: #c9d1d9; font-family: 'Courier New', monospace; }
+      .app-header { background: #161b22; border-bottom: 1px solid ${color}; }
+      .app-header h1 { color: ${color}; font-family: 'Courier New', monospace; letter-spacing: 0.05em; }
+      .identity-wrap { color: #8b949e; }
+      .identity-wrap input { background: #0d1117; border-color: #30363d; color: #c9d1d9; font-family: 'Courier New', monospace; }
+      nav { background: #161b22; border-bottom: 1px solid #30363d; }
+      nav button { color: #8b949e; font-family: 'Courier New', monospace; }
+      nav button:hover { color: ${color}; background: rgba(255,255,255,0.03); }
+      nav button.active { color: ${color}; border-bottom-color: ${color}; }
+      .card { background: #161b22; border: 1px solid #30363d; border-radius: 4px; box-shadow: none; }
+      .add-form { background: #161b22; border-color: #30363d; border-radius: 4px; }
+      .field-group input { background: #0d1117; border-color: #30363d; color: #c9d1d9; border-radius: 4px; font-family: 'Courier New', monospace; }
+      .field-group input:focus { border-color: ${color}; }
+      .field-group label { color: ${color}; font-family: 'Courier New', monospace; }
+      .btn { background: transparent; border: 1px solid ${color}; color: ${color}; border-radius: 4px; font-family: 'Courier New', monospace; }
+      .btn:hover { background: ${color}; color: #0d1117; }
+      .btn.ghost { border-color: #30363d; color: #8b949e; }
+      .btn.ghost:hover { border-color: #8b949e; background: transparent; color: #c9d1d9; }
+      .btn.danger { border-color: #f85149; color: #f85149; background: transparent; }
+      .btn.danger:hover { background: #f85149; color: white; }
+      .tally-bar { background: #21262d; }
+      .tally-bar-fill { background: ${color}; }
+      .item-card.my-pick { border-color: ${color}; }
+      .item-card:hover:not(.locked) { border-color: ${color}; box-shadow: none; }
+      .item-img-wrap { filter: grayscale(20%) contrast(1.1); }
+      .alert.info { background: #161b22; border-color: #1f6feb; color: #58a6ff; }
+      .alert.ok   { background: #161b22; border-color: #238636; color: #3fb950; }
+      .alert.err  { background: #161b22; border-color: #da3633; color: #f85149; }
+      .alert.warn { background: #161b22; border-color: #9e6a03; color: #d29922; }
+      .result-modal-inner { background: #161b22; border: 1px solid #30363d; }
+      .result-modal-name { color: ${color}; }
+      .voters-line { color: #8b949e; }
+      .loading { color: #8b949e; }
+      .empty { color: #8b949e; }
+    `,
+  };
+
+  function updateStylePreview() {
+    const style = document.getElementById('cfg-style').value;
+    const color = document.getElementById('cfg-color').value;
+    const dark  = darkenHex(color);
+    const css   = STYLE_PRESETS[style](color, dark);
+    const prev  = document.getElementById('style-preview');
+
+    // Show a mini color swatch preview
+    const headerColors = {
+      navy:     '#1a2035',
+      bold:     color,
+      clean:    '#ffffff',
+      terminal: '#161b22',
+    };
+    const bgColors = {
+      navy:     '#f4f6f9',
+      bold:     '#f4f6f9',
+      clean:    '#ffffff',
+      terminal: '#0d1117',
+    };
+    prev.style.background = bgColors[style];
+    prev.innerHTML = `
+      <div style="background:${headerColors[style]};height:24px;border-bottom:3px solid ${style === 'navy' ? color : style === 'clean' ? color : style === 'terminal' ? color : 'transparent'};display:flex;align-items:center;padding:0 12px;gap:8px">
+        <div style="width:60px;height:8px;border-radius:2px;background:${style === 'bold' ? 'rgba(255,255,255,0.9)' : color}"></div>
+      </div>
+      <div style="padding:8px 12px;display:flex;gap:6px">
+        <div style="height:20px;border-radius:${style === 'terminal' || style === 'bold' ? '2px' : '10px'};background:${color};padding:0 10px;font-size:9px;color:${style === 'terminal' ? '#0d1117' : 'white'};display:flex;align-items:center;font-family:${style === 'terminal' ? 'monospace' : 'sans-serif'}">Button</div>
+        <div style="flex:1;height:20px;border-radius:${style === 'terminal' || style === 'bold' ? '2px' : '8px'};background:${style === 'terminal' ? '#161b22' : style === 'clean' ? '#f4f6f9' : 'white'};border:1px solid ${style === 'terminal' ? '#30363d' : '#e1e5eb'}"></div>
+      </div>`;
+  }
+
+  // Init preview on load
+  setTimeout(updateStylePreview, 0);
+
   // ── FACE IMAGE UPLOAD ─────────────────────────────────────────────────────────
   window._faceImageUrl = '';
 
@@ -526,6 +662,7 @@
       field2Label:  document.getElementById('cfg-field2').value.trim(),
       color:        document.getElementById('cfg-color').value,
       colorDark:    darkenHex(document.getElementById('cfg-color').value),
+      style:        document.getElementById('cfg-style').value,
       openDay:      document.getElementById('cfg-open-day').value,
       closeDay:     document.getElementById('cfg-close-day').value,
       recency:      document.getElementById('cfg-recency').checked,
@@ -699,6 +836,7 @@
       '__ADMIN_ENCODED__':        encodedPasscodes,
       '__CHAOS_JS_URL__':         chaosJsUrl,
       '__FACE_IMAGE_URL__':       config.faceUrl,
+      '__THEME_CSS__':            STYLE_PRESETS[config.style](config.color, config.colorDark),
     };
 
     for (const [token, value] of Object.entries(tokens)) {
